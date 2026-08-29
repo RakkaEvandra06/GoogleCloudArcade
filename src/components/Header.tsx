@@ -59,17 +59,34 @@ export default function Header({ currentView, onViewChange, isLoggedIn }: Header
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-2.5 flex items-center justify-between gap-3">
 
         {/* ── Brand ── */}
-        <div className="flex items-center gap-2.5 shrink-0 select-none">
-          <div
-            className="w-7 h-7 rounded-lg overflow-hidden shrink-0"
-            style={{ border: `1px solid rgba(66,133,244,0.35)`, background: 'rgba(66,133,244,0.08)' }}
-          >
-            <img src="/500px.png" alt="" className="w-full h-full object-cover" />
+        {isLoggedIn ? (
+          <a href="/dashboard"
+            className="flex items-center gap-2.5 shrink-0 select-none no-underline group"
+            title="Go to dashboard">
+            <div
+              className="w-7 h-7 rounded-lg overflow-hidden shrink-0 transition-opacity group-hover:opacity-80"
+              style={{ border: `1px solid rgba(66,133,244,0.35)`, background: 'rgba(66,133,244,0.08)' }}
+            >
+              <img src="/500px.png" alt="" className="w-full h-full object-cover" />
+            </div>
+            <span className="font-bold text-sm tracking-tight transition-opacity group-hover:opacity-80"
+              style={{ color: 'var(--foreground)' }}>
+              {t('header.brand')}&nbsp;<span className="font-mono" style={{ color: 'var(--blue)' }}>{t('header.year')}</span>
+            </span>
+          </a>
+        ) : (
+          <div className="flex items-center gap-2.5 shrink-0 select-none">
+            <div
+              className="w-7 h-7 rounded-lg overflow-hidden shrink-0"
+              style={{ border: `1px solid rgba(66,133,244,0.35)`, background: 'rgba(66,133,244,0.08)' }}
+            >
+              <img src="/500px.png" alt="" className="w-full h-full object-cover" />
+            </div>
+            <span className="font-bold text-sm tracking-tight" style={{ color: 'var(--foreground)' }}>
+              {t('header.brand')}&nbsp;<span className="font-mono" style={{ color: 'var(--blue)' }}>{t('header.year')}</span>
+            </span>
           </div>
-          <span className="font-bold text-sm tracking-tight" style={{ color: 'var(--foreground)' }}>
-            {t('header.brand')}&nbsp;<span className="font-mono" style={{ color: 'var(--blue)' }}>{t('header.year')}</span>
-          </span>
-        </div>
+        )}
 
         {/* ── Nav tabs (desktop) ── */}
         {isLoggedIn && (
