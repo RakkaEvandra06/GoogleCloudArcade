@@ -281,7 +281,7 @@ export default function Dashboard({ participant, badges }: Props) {
     <div className="space-y-3 animate-fade-slide-up" style={{ position:'relative', zIndex:1 }}>
       {/* Sub-tab bar */}
       <div className="flex gap-1 p-1 rounded-xl" style={{ background:'var(--surface)', border:'1px solid var(--border-md)' }}>
-        {([['overview','⫶☰ Overview'],['catalog','ᯓ➤ FastTrack'],['badges','🜲 My Badges']] as [SubTab,string][]).map(([id,label]) => {
+        {([['overview', `⫶☰ ${t('dash.tab.overview')}`],['catalog', `ᯓ➤ ${t('dash.tab.fasttrack')}`],['badges', `🜲 ${t('dash.tab.mybadges')}`]] as [SubTab,string][]).map(([id,label]) => {
           const active = activeTab === id;
           return (
             <button key={id} onClick={() => { setActiveTab(id); setPage(1); }}
@@ -317,19 +317,19 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* Points */}
         <div className="glass-neon-cyan stagger-1 animate-fade-slide-up">
-          <p className="text-[10px] font-mono font-bold uppercase tracking-widest mb-2" style={{ color:'var(--blue)' }}>Arcade Points — August 2026</p>
+          <p className="text-[10px] font-mono font-bold uppercase tracking-widest mb-2" style={{ color:'var(--blue)' }}>{t('dash.points_aug')}</p>
           <div className="flex items-end gap-2 mb-4">
             <span className="font-black text-5xl leading-none" style={{ color:'var(--yellow)', fontFamily:'var(--font-mono)' }}>{total.toFixed(1)}</span>
-            <span className="text-sm font-medium mb-1" style={{ color:'var(--text-muted)' }}>pts total</span>
+            <span className="text-sm font-medium mb-1" style={{ color:'var(--text-muted)' }}>{t("dash.pts_total")}</span>
           </div>
           <div className="space-y-1.5">
-            <PtRow label="▷ Game Badges" count={games.length} pts={games.length} color="var(--primary)" note="×1 each" />
-            <PtRow label="🜲 Skill Badges" count={skills.length} pts={skills.length * 0.5} color="var(--purple)" note="×0.5 each" />
-            {facBonus > 0 && <PtRow label=">—͟͟͞͞★ Facilitator Bonus" count={undefined} pts={facBonus} color="var(--yellow)" note="milestone bonus" />}
+            <PtRow label={t("dash.label.game")} count={games.length} pts={games.length} color="var(--primary)" note={t("dash.label.each_one")} />
+            <PtRow label={t("dash.label.skill")} count={skills.length} pts={skills.length * 0.5} color="var(--purple)" note={t("dash.label.half_each")} />
+            {facBonus > 0 && <PtRow label={t("dash.label.fac_bonus")} count={undefined} pts={facBonus} color="var(--yellow)" note={t("dash.label.ms_bonus")} />}
           </div>
           <div className="mt-3 pt-3" style={{ borderTop:'1px solid var(--border)' }}>
             <div className="flex justify-between text-xs font-mono">
-              <span style={{ color:'var(--text-muted)' }}>Arcade Points (badges only)</span>
+              <span style={{ color:'var(--text-muted)' }}>{t("dash.pts_only")}</span>
               <span style={{ color:'var(--yellow)', fontWeight:700 }}>{arcPts.toFixed(1)} pts</span>
             </div>
           </div>
@@ -345,13 +345,13 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
                 <span className="text-3xl">{currentTier.emoji}</span>
                 <div>
                   <div className="font-black text-2xl tracking-tight" style={{ color: currentTier.color }}>{t(currentTier.key)}</div>
-                  <div className="text-xs font-mono mt-0.5" style={{ color:'var(--text-muted)' }}>{currentTier.min}+ {t('common.points_short')} required</div>
+                  <div className="text-xs font-mono mt-0.5" style={{ color:'var(--text-muted)' }}>{currentTier.min}+ {t('common.points_short')} {t('dash.pts_required')}</div>
                 </div>
               </div>
             ) : (
               <div>
                 <div className="font-bold text-xl" style={{ color:'var(--text-muted)' }}>{t('tier.unranked')}</div>
-                <div className="text-xs font-mono mt-0.5" style={{ color:'var(--text-muted)' }}>Need 50+ {t('common.points_short')} for {t('tier.trooper')}</div>
+                <div className="text-xs font-mono mt-0.5" style={{ color:'var(--text-muted)' }}>{t('dash.pts_for_trooper')}</div>
               </div>
             )}
           </div>
@@ -385,7 +385,7 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
 
       {/* ── Milestones (left 2 cols) + Activity Charts (right 1 col) ── */}
       <div>
-        <SectionLabel label="Facilitator Milestones — GCAF 2026 · Jul 13 – Sep 14" />
+        <SectionLabel label={t("dash.section.milestones_full")} />
 
         {/* Outer 3-col grid: milestones span 2, charts span 1 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -416,12 +416,12 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
                     {done ? `+${m.bonus} pts` : `${pct}%`}
                   </p>
                   <div className="space-y-2 mb-3">
-                    <ProgressRow label="▷ Game Badges"  done={gDone} total={m.games} color={m.color} />
-                    <ProgressRow label="🜲 Skill Badges" done={sDone} total={m.badge} color={m.color} />
+                    <ProgressRow label={t("dash.label.game")}  done={gDone} total={m.games} color={m.color} />
+                    <ProgressRow label={t("dash.label.skill")} done={sDone} total={m.badge} color={m.color} />
                   </div>
                   <p className="text-[10px] font-mono"
                     style={{ color: done ? m.color : 'var(--text-dim)' }}>
-                    {done ? 'Milestone bonus unlocked!' : `+${m.bonus} bonus pts on completion`}
+                    {done ? 'Milestone bonus unlocked!' : `+${m.bonus} ${t("dash.ms.on_compl")}`}
                   </p>
                 </div>
               );
@@ -445,7 +445,7 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
 
       {/* Active July 2026 Game Tracks — WITH real badge images */}
       <div>
-        <SectionLabel label="Active Game Tracks — August 2026" />
+        <SectionLabel label={t("dash.section.tracks_aug")} />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {JULY_TRACKS.map((track, i) => {
             const done = trackDone(track, games);
@@ -504,7 +504,7 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
                   <div className="mt-auto pt-2" style={{ borderTop:'1px solid var(--border)' }}>
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-[9px] font-mono font-bold uppercase tracking-widest mb-0.5" style={{ color:'var(--text-dim)' }}>Access Code</p>
+                        <p className="text-[9px] font-mono font-bold uppercase tracking-widest mb-0.5" style={{ color:'var(--text-dim)' }}>{t("dash.track.access_code")}</p>
                         <code className="text-[10px] font-mono font-bold" style={{ color: done ? track.levelColor : 'var(--blue)' }}>{track.accessCode}</code>
                       </div>
                       <span className="text-[9px] font-mono font-bold px-2 py-1 rounded-lg transition-all"
@@ -519,14 +519,14 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
           })}
         </div>
         <p className="text-[10px] font-mono mt-2 text-center" style={{ color:'var(--text-dim)' }}>
-          Each completed game = +1.0 Arcade Point · {games.length} / {JULY_TRACKS.length} completed this month
+          {t('dash.pts_each_game')} · {games.length} / {JULY_TRACKS.length} {t('dash.of_month')}
         </p>
       </div>
 
       {/* Recent achievements */}
       {monthly.length > 0 && (
         <div>
-          <SectionLabel label="Recent Achievements — August 2026" />
+          <SectionLabel label={t("dash.section.recent_aug")} />
           <div className="glass-card" style={{ padding:'1rem' }}>
             <div className="space-y-1.5 max-h-64 overflow-y-auto no-scrollbar">
               {monthly.sort((a,b) => new Date(b.earned_date).getTime()-new Date(a.earned_date).getTime()).slice(0,12).map((b,i) => {
@@ -542,7 +542,7 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
                       <span className="font-medium text-xs truncate" style={{ color:'var(--foreground)' }}>{b.badge_name}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="tag" style={{ background:`${bc}18`, color:bc, border:`1px solid ${bc}40` }}>+{b.points} pt</span>
+                      <span className="tag" style={{ background:`${bc}18`, color:bc, border:`1px solid ${bc}40` }}>+{b.points} {t('dash.pt_label')}</span>
                       <span className="text-[9px] font-mono" style={{ color:'var(--text-muted)' }}>{b.earned_date}</span>
                     </div>
                   </div>
@@ -563,12 +563,13 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
   status:'all'|'done'|'pending'; setStatus:(s:'all'|'done'|'pending')=>void;
   page:number; setPage:(p:number)=>void; totalPages:number; monthly:Badge[]; earnedSkills:Badge[];
 }) {
+  const { t } = useLang();
   /* Counts in status-button badges always reflect base filter (search+cat+diff)
      NOT the active status — so clicking Done → Pending → All is always consistent */
   const STATUS_OPTS: { key:'all'|'done'|'pending'; label:string; count:number; color:string; bg:string }[] = [
-    { key:'all',     label:'ALL',   count: baseTotal,          color:'#fff',  bg:'var(--blue)'  },
-    { key:'done',    label:'DONE',    count: baseDoneCount,    color:'#fff',  bg:'var(--green)' },
-    { key:'pending', label:'PENDING', count: basePendingCount, color:'#fff',  bg:'var(--red)'   },
+    { key:'all',     label:t('catalog.status.all'),   count: baseTotal,          color:'#fff',  bg:'var(--blue)'  },
+    { key:'done',    label:t('catalog.status.done'),    count: baseDoneCount,    color:'#fff',  bg:'var(--green)' },
+    { key:'pending', label:t('catalog.status.pending'), count: basePendingCount, color:'#fff',  bg:'var(--red)'   },
   ];
 
   return (
@@ -579,8 +580,8 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
         style={{ background:'linear-gradient(135deg, var(--blue-dim) 0%, var(--green-dim) 100%)', border:'1px solid var(--blue-border)' }}>
         <div className="flex items-center gap-3 p-4 overflow-x-auto no-scrollbar">
           <div className="shrink-0">
-            <p className="text-xs font-bold mb-0.5" style={{ color:'var(--blue)' }}>ᯓ➤ FastTrack Skill Badges</p>
-            <p className="text-[10px] font-mono" style={{ color:'var(--text-muted)' }}>Complete skill badges alongside August's game tracks</p>
+            <p className="text-xs font-bold mb-0.5" style={{ color:'var(--blue)' }}>{t('catalog.banner.title')}</p>
+            <p className="text-[10px] font-mono" style={{ color:'var(--text-muted)' }}>{t('catalog.banner.desc')}</p>
           </div>
           <div className="flex gap-2 ml-auto shrink-0">
             {JULY_TRACKS.map(track => (
@@ -597,10 +598,10 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
         {/* Stats bar */}
         <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 py-2.5 text-[10px] font-mono font-bold"
           style={{ borderTop:'1px solid var(--blue-border)', background:'rgba(0,0,0,0.12)' }}>
-          <span style={{ color:'var(--foreground)' }}>{baseTotal} badges</span>
-          <span style={{ color:'var(--green)' }}>✓ {baseDoneCount} Done</span>
-          <span style={{ color:'var(--red)' }}>⟳ {basePendingCount} Pending</span>
-          <span style={{ color:'var(--yellow)' }}>+{(baseDoneCount * 0.5).toFixed(1)} pts earned</span>
+          <span style={{ color:'var(--foreground)' }}>{baseTotal} {t('catalog.stat.badges')}</span>
+          <span style={{ color:'var(--green)' }}>✓ {baseDoneCount} {t('catalog.stat.done')}</span>
+          <span style={{ color:'var(--red)' }}>⟳ {basePendingCount} {t('catalog.stat.pending')}</span>
+          <span style={{ color:'var(--yellow)' }}>+{(baseDoneCount * 0.5).toFixed(1)} {t('catalog.stat.pts_earned')}</span>
         </div>
       </div>
 
@@ -631,12 +632,12 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
         {/* ── Search + level filter ── */}
         <div className="flex flex-col md:flex-row gap-2 mb-3">
           <input type="text" value={search} onChange={e=>setSearch(e.target.value)}
-            placeholder="Search skill badges…" className="glass-input py-2 text-xs flex-1" />
+            placeholder={t("catalog.search")} className="glass-input py-2 text-xs flex-1" />
           <select value={diff} onChange={e=>setDiff(e.target.value)} className="glass-select w-full md:w-36">
-            <option value="all">All levels</option>
-            <option value="introductory">Introductory</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
+            <option value="all">{t("catalog.all_levels")}</option>
+            <option value="introductory">{t("catalog.intro")}</option>
+            <option value="intermediate">{t("catalog.inter")}</option>
+            <option value="advanced">{t("catalog.adv")}</option>
           </select>
         </div>
 
@@ -686,8 +687,8 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
                   </div>
                   {/* ── PROMINENT STATUS BADGE ── */}
                   {done
-                    ? <span className="status-done shrink-0">✓ Done</span>
-                    : <span className="status-pending shrink-0">⟳ Pending</span>
+                    ? <span className="status-done shrink-0">{t("catalog.done_pill")}</span>
+                    : <span className="status-pending shrink-0">{t("catalog.pending_pill")}</span>
                   }
                 </div>
 
@@ -714,7 +715,7 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
                     </span>
                   )}
                   {(s as any).credits === 0 && (
-                    <span className="tag tag-green text-[8px]">✦ Free</span>
+                    <span className="tag tag-green text-[8px]">{t("catalog.free")}</span>
                   )}
                 </div>
 
@@ -743,9 +744,9 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
           <div className="py-14 text-center rounded-xl" style={{ border:'1px dashed var(--border-md)' }}>
             <p className="text-2xl mb-2">{status === 'done' ? '🎉' : status === 'pending' ? '📋' : '🔍'}</p>
             <p className="text-sm font-semibold mb-1" style={{ color:'var(--foreground)' }}>
-              {status === 'done' ? 'No badges have been completed yet' : status === 'pending' ? 'All badges have been completed!' : 'No badges found'}
+              {status === 'done' ? t('catalog.empty.no_done') : status === 'pending' ? t('catalog.empty.all_done') : t('catalog.empty.not_found')}
             </p>
-            <p className="text-xs font-mono" style={{ color:'var(--text-muted)' }}>Try changing the filter or search keyword</p>
+            <p className="text-xs font-mono" style={{ color:'var(--text-muted)' }}>{t('catalog.empty.hint')}</p>
           </div>
         )}
 
@@ -753,12 +754,12 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
           <div className="flex justify-center items-center gap-4 mt-4 pt-3"
             style={{ borderTop:'1px solid var(--border)' }}>
             <button onClick={()=>setPage(Math.max(1,page-1))} disabled={page===1}
-              className="btn-ghost px-3 py-1.5 text-[10px]" style={{ opacity: page===1 ? 0.3 : 1 }}>← Prev</button>
+              className="btn-ghost px-3 py-1.5 text-[10px]" style={{ opacity: page===1 ? 0.3 : 1 }}>{t('catalog.prev')}</button>
             <span className="text-xs font-mono font-bold" style={{ color:'var(--foreground)' }}>
               Page {page} / {totalPages}
             </span>
             <button onClick={()=>setPage(Math.min(totalPages,page+1))} disabled={page===totalPages}
-              className="btn-ghost px-3 py-1.5 text-[10px]" style={{ opacity: page===totalPages ? 0.3 : 1 }}>Next →</button>
+              className="btn-ghost px-3 py-1.5 text-[10px]" style={{ opacity: page===totalPages ? 0.3 : 1 }}>{t('catalog.next')}</button>
           </div>
         )}
       </div>
@@ -768,6 +769,7 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
 
 /* ─── BADGES TAB ────────────────────────────────────────── */
 function BadgesTab({ badges, monthly }: { badges:Badge[]; monthly:Badge[] }) {
+  const { t } = useLang();
   const [filter, setFilter] = useState<'current'|'all'|'historical'>('current');
   const historical = badges.filter(b => b.earned_date < ACTIVE_START);
   const display = filter==='current' ? monthly : filter==='historical' ? historical : badges;
@@ -775,9 +777,9 @@ function BadgesTab({ badges, monthly }: { badges:Badge[]; monthly:Badge[] }) {
   return (
     <div className="glass-card animate-fade-slide-up space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-[10px] font-mono font-bold uppercase tracking-widest" style={{ color:'var(--blue)' }}>Badge Collection</p>
+        <p className="text-[10px] font-mono font-bold uppercase tracking-widest" style={{ color:'var(--blue)' }}>{t("badges.title")}</p>
         <div className="flex p-1 rounded-lg gap-1" style={{ background:'var(--surface-alt)', border:'1px solid var(--border-md)' }}>
-          {([['current',`August 2026 (${monthly.length})`],['all',`All (${badges.length})`],['historical',`Archive (${historical.length})`]] as const).map(([k,l]) => (
+          {([['current', `${t('badges.tab.current')} (${monthly.length})`],['all', `${t('badges.tab.all')} (${badges.length})`],['historical', `${t('badges.tab.archive')} (${historical.length})`]] as const).map(([k,l]) => (
             <button key={k} onClick={()=>setFilter(k)} className="px-3 py-1.5 rounded-md text-[10px] font-mono font-bold transition-all"
               style={{ background:filter===k?'var(--blue)':'transparent', color:filter===k?'#fff':'var(--text-muted)' }}>{l}</button>
           ))}
@@ -786,7 +788,7 @@ function BadgesTab({ badges, monthly }: { badges:Badge[]; monthly:Badge[] }) {
 
       {display.length === 0 ? (
         <div className="py-12 text-center rounded-xl" style={{ border:'1px dashed var(--border-md)' }}>
-          <p className="text-xs font-mono" style={{ color:'var(--text-muted)' }}>No badges in this category yet.</p>
+          <p className="text-xs font-mono" style={{ color:'var(--text-muted)' }}>{t('badges.empty')}</p>
         </div>
       ) : (
         <div className="space-y-1.5 max-h-[520px] overflow-y-auto no-scrollbar">
@@ -809,7 +811,7 @@ function BadgesTab({ badges, monthly }: { badges:Badge[]; monthly:Badge[] }) {
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="tag text-[9px]" style={{ background:`${bc}18`, color:bc, border:`1px solid ${bc}40` }}>{isGame?'Game':'Skill'}</span>
                   {isActive
-                    ? <span className="tag tag-gold text-[9px]">+{b.points} pt</span>
+                    ? <span className="tag tag-gold text-[9px]">+{b.points} {t('dash.pt_label')}</span>
                     : <span className="tag tag-gray text-[9px]">Archive</span>
                   }
                 </div>
