@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { COOKIE_NAME, SESSION_MAX_AGE } from '@/lib/session';
+import { COOKIE_NAME, SESSION_MAX_AGE } from '@/lib/session-constants';
 
 async function getRole(cookieValue: string): Promise<string | null> {
   try {
@@ -35,14 +35,14 @@ export async function middleware(request: NextRequest) {
 
   // ── Already logged in → skip login pages ──────────────────
   if (pathname === '/player-login' && role === 'player')
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   if (pathname === '/facilitator-login' && role === 'facilitator')
     return NextResponse.redirect(new URL('/facilitator', request.url));
   if (pathname === '/admin-login' && role === 'admin')
     return NextResponse.redirect(new URL('/admin', request.url));
 
   // ── Player dashboard ───────────────────────────────────────
-  if (pathname === '/') {
+  if (pathname === '/' || pathname === '/dashboard') {
     if (role !== 'player')
       return NextResponse.redirect(new URL('/player-login', request.url));
   }
@@ -65,6 +65,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/',
+    '/dashboard',
     '/facilitator',
     '/facilitator/:path*',
     '/admin',
