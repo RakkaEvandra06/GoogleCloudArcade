@@ -1,4 +1,5 @@
 'use client';
+import { useLang } from '@/lib/LanguageContext';
 import { useState, useEffect } from 'react';
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from '@radix-ui/react-icons';
 
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export default function AccessCodeModal({ track, onClose }: Props) {
+  const { t } = useLang();
   const [copied, setCopied] = useState(false);
 
   /* Close on Escape */
@@ -130,7 +132,7 @@ export default function AccessCodeModal({ track, onClose }: Props) {
             {/* Access code */}
             <div className="mb-5">
               <p className="text-[9px] font-mono font-bold uppercase tracking-widest mb-2 text-center" style={{ color: 'var(--text-muted)' }}>
-                🔑 Access Code — paste this on Google Skills
+                {t('modal.access.code')}
               </p>
               <div
                 className="flex items-center gap-3 px-4 py-3 rounded-xl"
@@ -178,19 +180,19 @@ export default function AccessCodeModal({ track, onClose }: Props) {
                 lineHeight: 1.7,
               }}
             >
-              <p className="font-bold mb-1" style={{ color: 'var(--blue)' }}>How to Use:</p>
+              <p className="font-bold mb-1" style={{ color: 'var(--blue)' }}>{t('modal.how_to_use')}</p>
               <ol className="space-y-0.5 list-decimal list-inside">
-                <li>Copy the access code above</li>
-                <li>Click &quot;Open Google Skills&quot; below</li>
-                <li>Paste the code when prompted</li>
-                <li>Start working on the lab!</li>
+                <li>{t('modal.step1')}</li>
+                <li>{t('modal.step2')}</li>
+                <li>{t('modal.step3')}</li>
+                <li>{t('modal.step4')}</li>
               </ol>
             </div>
 
             {/* Action buttons */}
             <div className="flex gap-2.5">
               <button onClick={onClose} className="btn-ghost flex-1 text-xs py-2.5">
-                Close
+                {t('modal.close')}
               </button>
               <button
                 onClick={handleOpen}
