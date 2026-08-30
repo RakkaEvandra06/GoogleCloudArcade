@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 220" width="900" height="220">
+  <defs>
+    <!-- Filters -->
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="badge-glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="scan-blur" x="0%" y="0%" width="100%" height="100%">
+      <feGaussianBlur stdDeviation="0.4"/>
+    </filter>
+
+    <!-- Gradients -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#020817"/>
+      <stop offset="48%" stop-color="#0c0a2e"/>
+      <stop offset="100%" stop-color="#020817"/>
+    </linearGradient>
+    <linearGradient id="title-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="40%" stop-color="#e0f2fe"/>
+      <stop offset="60%" stop-color="#e0f2fe"/>
+      <stop offset="100%" stop-color="#60a5fa"/>
+    </linearGradient>
+    <linearGradient id="badge-gold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="badge-purple" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="badge-green" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="badge-blue" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#93c5fd"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+
+    <!-- Grid pattern -->
+    <pattern id="grid" x="0" y="0" width="45" height="45" patternUnits="userSpaceOnUse">
+      <path d="M 45 0 L 0 0 0 45" fill="none" stroke="rgba(59,130,246,0.07)" stroke-width="0.8"/>
+    </pattern>
+
+    <!-- Scanlines -->
+    <pattern id="scan" x="0" y="0" width="2" height="4" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="2" height="2" fill="rgba(0,0,0,0.18)"/>
+    </pattern>
+
+    <style>
+      @keyframes pulse-glow {
+        0%,100%{opacity:1}
+        50%{opacity:0.72}
+      }
+      @keyframes badge-bounce {
+        0%,100%{transform:translateY(0)}
+        50%{transform:translateY(-7px)}
+      }
+      @keyframes twinkle {
+        0%,100%{opacity:0.1}
+        50%{opacity:1}
+      }
+      @keyframes subtitle-fade {
+        0%,100%{opacity:0.65}
+        50%{opacity:1}
+      }
+      @keyframes corner-pulse {
+        0%,100%{opacity:0.9}
+        50%{opacity:0.35}
+      }
+      @keyframes scan-sweep {
+        0%{transform:translateY(-220px)}
+        100%{transform:translateY(220px)}
+      }
+      .title{animation:pulse-glow 2.8s ease-in-out infinite}
+      .sub{animation:subtitle-fade 3.5s ease-in-out infinite}
+      .s1{animation:twinkle 2.1s ease-in-out infinite 0s}
+      .s2{animation:twinkle 1.7s ease-in-out infinite 0.5s}
+      .s3{animation:twinkle 2.8s ease-in-out infinite 1s}
+      .s4{animation:twinkle 1.4s ease-in-out infinite 0.3s}
+      .s5{animation:twinkle 3.1s ease-in-out infinite 0.8s}
+      .s6{animation:twinkle 2.4s ease-in-out infinite 1.5s}
+      .s7{animation:twinkle 1.9s ease-in-out infinite 0.2s}
+      .s8{animation:twinkle 2.6s ease-in-out infinite 1.1s}
+      .s9{animation:twinkle 1.6s ease-in-out infinite 0.7s}
+      .s10{animation:twinkle 2.3s ease-in-out infinite 1.8s}
+      .s11{animation:twinkle 1.8s ease-in-out infinite 0.4s}
+      .s12{animation:twinkle 3.0s ease-in-out infinite 1.3s}
+      .s13{animation:twinkle 2.5s ease-in-out infinite 0.9s}
+      .s14{animation:twinkle 1.5s ease-in-out infinite 1.6s}
+      .b1{animation:badge-bounce 3.1s ease-in-out infinite 0s}
+      .b2{animation:badge-bounce 3.5s ease-in-out infinite 0.6s}
+      .b3{animation:badge-bounce 2.9s ease-in-out infinite 1.1s}
+      .b4{animation:badge-bounce 3.3s ease-in-out infinite 0.3s}
+      .corner{animation:corner-pulse 4s ease-in-out infinite}
+      .sweep{animation:scan-sweep 6s linear infinite}
+    </style>
+  </defs>
+
+  <!-- ── Background ── -->
+  <rect width="900" height="220" rx="10" fill="url(#bg)"/>
+  <rect width="900" height="220" rx="10" fill="url(#grid)"/>
+
+  <!-- ── Stars ── -->
+  <circle cx="44" cy="24" r="1.5" fill="#fff" class="s1"/>
+  <circle cx="118" cy="188" r="2" fill="#60a5fa" class="s2"/>
+  <circle cx="836" cy="32" r="1.5" fill="#fff" class="s3"/>
+  <circle cx="873" cy="172" r="2" fill="#60a5fa" class="s4"/>
+  <circle cx="792" cy="210" r="1.5" fill="#fff" class="s5"/>
+  <circle cx="26" cy="150" r="1.5" fill="#60a5fa" class="s6"/>
+  <circle cx="884" cy="92" r="2" fill="#fff" class="s7"/>
+  <circle cx="70" cy="78" r="1" fill="#93c5fd" class="s8"/>
+  <circle cx="196" cy="16" r="1.5" fill="#fff" class="s9"/>
+  <circle cx="714" cy="11" r="1.5" fill="#60a5fa" class="s10"/>
+  <circle cx="658" cy="207" r="1.5" fill="#fff" class="s11"/>
+  <circle cx="248" cy="207" r="1" fill="#60a5fa" class="s12"/>
+  <circle cx="340" cy="14" r="1" fill="#fff" class="s13"/>
+  <circle cx="560" cy="206" r="1" fill="#93c5fd" class="s14"/>
+
+  <!-- ── Outer border ── -->
+  <rect x="3" y="3" width="894" height="214" rx="8" fill="none" stroke="#1e3a8a" stroke-width="1.5" opacity="0.7"/>
+
+  <!-- ══ LEFT BADGES ══ -->
+  <!-- LEGEND badge (pentagonal) -->
+  <g class="b1">
+    <polygon points="78,56 97,70 90,92 66,92 59,70" fill="url(#badge-gold)" filter="url(#badge-glow)" opacity="0.95"/>
+    <polygon points="78,59 95,72 88,90 68,90 61,72" fill="#fef3c7" opacity="0.15"/>
+    <text x="78" y="80" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="#fff">★</text>
+    <text x="78" y="100" text-anchor="middle" font-family="'Courier New',monospace" font-size="7.5" font-weight="bold" fill="#fcd34d" letter-spacing="0.5">LEGEND</text>
+  </g>
+
+  <!-- CHAMPION badge (hexagonal) -->
+  <g class="b2">
+    <polygon points="158,48 178,59 178,81 158,92 138,81 138,59" fill="url(#badge-purple)" filter="url(#badge-glow)" opacity="0.95"/>
+    <polygon points="158,51 176,62 176,79 158,90 140,79 140,62" fill="#ede9fe" opacity="0.12"/>
+    <text x="158" y="74" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#fff">◆</text>
+    <text x="158" y="101" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" font-weight="bold" fill="#c4b5fd" letter-spacing="0.5">CHAMPION</text>
+  </g>
+
+  <!-- ══ RIGHT BADGES ══ -->
+  <!-- RANGER badge (hexagonal) -->
+  <g class="b3">
+    <polygon points="742,48 762,59 762,81 742,92 722,81 722,59" fill="url(#badge-green)" filter="url(#badge-glow)" opacity="0.95"/>
+    <polygon points="742,51 760,62 760,79 742,90 724,79 724,62" fill="#d1fae5" opacity="0.12"/>
+    <text x="742" y="74" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#fff">⬡</text>
+    <text x="742" y="101" text-anchor="middle" font-family="'Courier New',monospace" font-size="8" font-weight="bold" fill="#6ee7b7" letter-spacing="0.5">RANGER</text>
+  </g>
+
+  <!-- TROOPER badge (pentagonal) -->
+  <g class="b4">
+    <polygon points="822,56 841,70 834,92 810,92 803,70" fill="url(#badge-blue)" filter="url(#badge-glow)" opacity="0.95"/>
+    <polygon points="822,59 839,72 832,90 812,90 805,72" fill="#eff6ff" opacity="0.15"/>
+    <text x="822" y="80" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="bold" fill="#fff">⬡</text>
+    <text x="822" y="100" text-anchor="middle" font-family="'Courier New',monospace" font-size="7.5" font-weight="bold" fill="#93c5fd" letter-spacing="0.5">TROOPER</text>
+  </g>
+
+  <!-- ══ MAIN TITLE ══ -->
+  <text x="450" y="104"
+        text-anchor="middle"
+        font-family="'Courier New','Lucida Console',monospace"
+        font-size="50"
+        font-weight="900"
+        letter-spacing="6"
+        fill="url(#title-grad)"
+        filter="url(#glow)"
+        class="title">ARCADE TRACKER</text>
+
+  <!-- Separator line + dot -->
+  <line x1="208" y1="120" x2="395" y2="120" stroke="#1e40af" stroke-width="1" opacity="0.55"/>
+  <circle cx="450" cy="120" r="3.5" fill="#3b82f6" opacity="0.75"/>
+  <line x1="505" y1="120" x2="692" y2="120" stroke="#1e40af" stroke-width="1" opacity="0.55"/>
+
+  <!-- ══ SUBTITLE ══ -->
+  <text x="450" y="147"
+        text-anchor="middle"
+        font-family="'Courier New','Lucida Console',monospace"
+        font-size="13.5"
+        letter-spacing="2.8"
+        fill="#7dd3fc"
+        class="sub">GOOGLE CLOUD ARCADE PROGRESS DASHBOARD</text>
+
+  <!-- ══ TECH PILLS ══ -->
+  <g opacity="0.88">
+    <rect x="228" y="164" width="76" height="22" rx="11" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="266" y="179" text-anchor="middle" font-family="'Courier New',monospace" font-size="10" fill="#94a3b8">⬡ Next.js</text>
+
+    <rect x="312" y="164" width="86" height="22" rx="11" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="355" y="179" text-anchor="middle" font-family="'Courier New',monospace" font-size="10" fill="#94a3b8">◆ TypeScript</text>
+
+    <rect x="406" y="164" width="88" height="22" rx="11" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="450" y="179" text-anchor="middle" font-family="'Courier New',monospace" font-size="10" fill="#94a3b8">◈ Supabase</text>
+
+    <rect x="502" y="164" width="80" height="22" rx="11" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="542" y="179" text-anchor="middle" font-family="'Courier New',monospace" font-size="10" fill="#94a3b8">⬡ Tailwind</text>
+
+    <rect x="590" y="164" width="64" height="22" rx="11" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="622" y="179" text-anchor="middle" font-family="'Courier New',monospace" font-size="10" fill="#94a3b8">▲ Vercel</text>
+  </g>
+
+  <!-- ══ SCAN SWEEP (CRT) ══ -->
+  <rect width="900" height="8" fill="rgba(147,197,253,0.04)" rx="2" class="sweep" filter="url(#scan-blur)"/>
+
+  <!-- Scanlines overlay -->
+  <rect width="900" height="220" rx="10" fill="url(#scan)" opacity="0.28"/>
+
+  <!-- ══ CORNER BRACKETS ══ -->
+  <g class="corner" stroke="#3b82f6" stroke-width="2" fill="none" opacity="0.9">
+    <path d="M 16 16 L 44 16 M 16 16 L 16 44"/>
+    <path d="M 884 16 L 856 16 M 884 16 L 884 44"/>
+    <path d="M 16 204 L 44 204 M 16 204 L 16 176"/>
+    <path d="M 884 204 L 856 204 M 884 204 L 884 176"/>
+  </g>
+
+  <!-- Top + bottom accent lines -->
+  <rect x="0" y="0" width="900" height="3" rx="2" fill="#1e40af" opacity="0.7"/>
+  <rect x="0" y="217" width="900" height="3" rx="2" fill="#1e40af" opacity="0.7"/>
+</svg>
