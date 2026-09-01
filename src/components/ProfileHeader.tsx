@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Participant, Badge } from '@/lib/db';
 import { ExternalLinkIcon, ExitIcon, UpdateIcon } from '@radix-ui/react-icons';
 import { useLang } from '@/lib/LanguageContext';
 import SignOutDialog from '@/components/SignOutDialog';
+import { computeStreak, saveStreakData, loadStreakData } from '@/lib/streak';
 
 const ACTIVE_START = '2026-07-01';
 
@@ -29,6 +30,32 @@ export default function ProfileHeader({ participant, badges, onResetSession, onS
   const initials = participant.name
     .split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
 
+  /* ── Streak state ──────────────────────────────────────────────────────────
+     Derived from the badge earned_date values (game + skill_badge only).
+     Persisted to localStorage so it survives page reloads and is available
+     before the first recompute runs.                                         */
+  const [streak, setStreak] = useState({ current: 0, longest: 0 });
+
+  useEffect(() => {
+    // Initialise from cache so the value is available on first render
+    const cached = loadStreakData(participant.id);
+    if (cached) setStreak({ current: cached.current, longest: cached.longest });
+  }, [participant.id]);
+
+  useEffect(() => {
+    // Recompute whenever the badges array changes (e.g. after a sync).
+    // Only game and skill_badge categories count toward the daily streak,
+    // mirroring the same categories shown in Sub-tab bar + Recent Achievements.
+    const dates = badges
+      .filter(b => b.category === 'game' || b.category === 'skill_badge')
+      .map(b => b.earned_date);
+
+    const result = computeStreak(dates);
+    setStreak({ current: result.current, longest: result.longest });
+    saveStreakData(participant.id, { ...result, updatedAt: Date.now() });
+  }, [badges, participant.id]);
+
+  /* ── Sync handler ─────────────────────────────────────────────────────── */
   const handleSync = async () => {
     if (!onSync || isSyncing) return;
     setSync(true);
@@ -69,6 +96,8 @@ export default function ProfileHeader({ participant, badges, onResetSession, onS
         {/* Stats + actions */}
         <div className="flex flex-col sm:items-end gap-3 shrink-0">
           <div className="flex items-center gap-2">
+            {/* 🔥 Streak pill — left of pts, as specified */}
+            <StreakPill current={streak.current} longest={streak.longest} t={t} />
             <Pill label={t('profile.pts')}    value={pts.toFixed(1)} color="var(--yellow)" />
             <Pill label={t('profile.games')}  value={String(games)}  color="var(--blue)" />
             <Pill label={t('profile.skills')} value={String(skills)} color="var(--purple)" />
@@ -112,6 +141,38 @@ export default function ProfileHeader({ participant, badges, onResetSession, onS
   );
 }
 
+/* ─── StreakPill ─────────────────────────────────────────────────────────────
+   Shows 🔥 + day count when there is an active consecutive run.
+   Falls back to a muted "—" with a neutral label when streak is 0.
+   The `longest` value appears as a tooltip so it's visible without cluttering
+   the pill layout.                                                            */
+function StreakPill({ current, longest, t }: { current: number; longest: number; t: (key: string) => string }) {
+  const active  = current > 0;
+  const color   = active ? '#f97316' : 'var(--text-dim)';
+  const bg      = active ? 'rgba(249,115,22,0.10)' : 'rgba(255,255,255,0.04)';
+  const border  = active ? 'rgba(249,115,22,0.35)' : 'var(--border)';
+  const tip     = longest > 1
+    ? `${t('streak.best')}: ${longest}`
+    : undefined;
+
+  return (
+    <div
+      title={tip}
+      className="flex flex-col items-center px-3 py-1.5 rounded-lg cursor-default select-none"
+      style={{ background: bg, border: `1px solid ${border}` }}
+    >
+      <span className="font-mono text-base font-black leading-none" style={{ color }}>
+        {active ? `🔥 ${current}` : '—'}
+      </span>
+      <span className="font-mono text-[9px] font-bold uppercase tracking-widest mt-0.5"
+        style={{ color: 'var(--text-muted)' }}>
+        {active ? t('streak.label') : t('streak.none')}
+      </span>
+    </div>
+  );
+}
+
+/* ─── Pill ───────────────────────────────────────────────────────────────── */
 function Pill({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="flex flex-col items-center px-3 py-1.5 rounded-lg"
