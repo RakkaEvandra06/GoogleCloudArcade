@@ -5,7 +5,7 @@ const TTL_MS     = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export interface PlayerAuth { url: string; name?: string; savedAt: number; }
 export interface FacAuth    { code: string; name?: string; savedAt: number; }
-export interface AdminAuth  { savedAt: number; }
+export interface AdminAuth  { secret: string; savedAt: number; }
 
 function isExpired(savedAt: number): boolean {
   return Date.now() - savedAt > TTL_MS;
@@ -55,9 +55,9 @@ export function clearFacAuth(): void {
   safeClear(FAC_KEY);
 }
 
-/* ── Admin (no secret stored — timestamp only) ──────────── */
-export function saveAdminAuth(): void {
-  safeSet(ADMIN_KEY, { savedAt: Date.now() });
+/* ── Admin ──────────────────────────────────────────────── */
+export function saveAdminAuth(secret: string): void {
+  safeSet(ADMIN_KEY, { secret, savedAt: Date.now() });
 }
 export function loadAdminAuth(): AdminAuth | null {
   return safeGet<AdminAuth>(ADMIN_KEY);

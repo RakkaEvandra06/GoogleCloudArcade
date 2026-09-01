@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { ToastContainer } from '@/components/Toast';
-import { savePlayerAuth, pruneExpiredAuth } from '@/lib/localAuth';
+import { savePlayerAuth, loadPlayerAuth, clearPlayerAuth, pruneExpiredAuth, authExpiresIn, type PlayerAuth } from '@/lib/localAuth';
 import { useLang } from '@/lib/LanguageContext';
 import type { Lang } from '@/lib/i18n';
 
@@ -36,6 +36,7 @@ export default function PlayerLoginPage() {
   const [loadingMsg,     setLoadingMsg]     = useState('');
   const [loadingStep,    setLoadingStep]    = useState(0);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [savedAuth,      setSavedAuth]      = useState<PlayerAuth | null>(null);
   const { toasts, add: addToast, remove: removeToast } = useToast();
 
   const STEPS = (l: Lang) => [
@@ -52,6 +53,12 @@ export default function PlayerLoginPage() {
 
   useEffect(() => {
     pruneExpiredAuth();
+
+    // Pre-fill last used URL immediately (synchronous — no flicker)
+    const stored = loadPlayerAuth();
+    if (stored) { setSavedAuth(stored); setProfileUrl(stored.url); }
+
+    // Check for an active server session — redirect if still logged in
     (async () => {
       try {
         const meRes = await fetch('/api/auth/me');
@@ -146,12 +153,30 @@ export default function PlayerLoginPage() {
             <p className="text-xs mb-4" style={{ color:'var(--text-muted)' }}>
               {t('player.url_hint')}
             </p>
+
+            {savedAuth && (
+              <div className="mb-4 px-3 py-2.5 rounded-lg flex items-center justify-between text-[9px] font-mono"
+                style={{ background:'rgba(66,133,244,0.08)', border:'1px solid rgba(66,133,244,0.20)' }}>
+                <span style={{ color:'var(--blue)' }}>
+                  ✓ {t('auth.saved_player')}{savedAuth.name ? ` · ${savedAuth.name}` : ''}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span style={{ color:'var(--text-dim)' }}>{t('auth.expiry_note')} · {authExpiresIn(savedAuth.savedAt)}</span>
+                  <button
+                    type="button"
+                    onClick={() => { clearPlayerAuth(); setSavedAuth(null); setProfileUrl(''); }}
+                    className="text-[8px] px-1.5 py-0.5 rounded hover:opacity-70 transition-opacity"
+                    style={{ background:'var(--surface)', color:'var(--text-dim)' }}>✕</button>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleLogin} className="space-y-3">
               <div>
                 <input type="url" value={profileUrl}
                   onChange={e => setProfileUrl(e.target.value)}
                   placeholder={t('login.player.placeholder')}
-                  className="glass-input" required disabled={isLoading} autoFocus />
+                  className="glass-input" required disabled={isLoading} autoFocus={!savedAuth} />
                 <p className="text-[9px] font-mono mt-1.5" style={{ color:'var(--text-dim)' }}>
                   {t('login.player.public_note')}
                 </p>

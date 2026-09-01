@@ -16,8 +16,20 @@ async function resolveId(ctx: Context): Promise<string | null> {
 }
 
 export async function GET(_req: Request, ctx: Context) {
+  // ── Auth ───────────────────────────────────────────────────────────────────
+  // Previously unauthenticated — any caller who knew a UUID could read the
+  // full participant record + all badges without logging in.
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+
   const id = await resolveId(ctx);
   if (!id) return NextResponse.json({ error: 'Invalid participant ID.' }, { status: 400 });
+
+  // Players may only read their own record; facilitators and admins may read any.
+  if (session.role === 'player' && session.participantId !== id) {
+    return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
+  }
+
   try {
     const participant = await getParticipant(id);
     if (!participant) return NextResponse.json({ error: 'Participant not found.' }, { status: 404 });
