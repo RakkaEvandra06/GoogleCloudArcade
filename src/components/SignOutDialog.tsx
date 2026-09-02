@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ExitIcon } from '@radix-ui/react-icons';
 import { useLang } from '@/lib/LanguageContext';
-import { useTheme } from '@/lib/useTheme';
 
 interface SignOutDialogProps {
   isOpen: boolean;
@@ -14,8 +13,25 @@ interface SignOutDialogProps {
 
 export default function SignOutDialog({ isOpen, onConfirm, onCancel, userName }: SignOutDialogProps) {
   const { t } = useLang();
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+
+  const [isDark, setIsDark] = useState(true); // safe SSR default; corrected on first client effect
+
+  useEffect(() => {
+    const sync = () =>
+      setIsDark(document.documentElement.getAttribute('data-theme') !== 'light');
+
+    // Correct value immediately on mount (before any user interaction)
+    sync();
+
+    // Stay in sync for all subsequent theme changes
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -52,12 +68,17 @@ export default function SignOutDialog({ isOpen, onConfirm, onCancel, userName }:
           <div
             className="relative w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5 animate-scale-in"
             style={{
-              background: isDark ? 'rgba(13,19,25,0.98)' : 'rgba(250,251,253,0.98)',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'}`,
-              boxShadow: isDark ? '0 24px 48px rgba(0,0,0,0.6)' : '0 24px 48px rgba(0,0,0,0.14)',
+              /* Light: pure white card matching reference image.
+                 Dark:  near-opaque deep-navy panel. */
+              background: isDark ? 'rgba(13,19,25,0.98)' : '#ffffff',
+              border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)'}`,
+              boxShadow: isDark
+                ? '0 24px 48px rgba(0,0,0,0.60), 0 4px 12px rgba(0,0,0,0.30)'
+                : '0 20px 60px rgba(0,0,0,0.14), 0 4px 16px rgba(0,0,0,0.06)',
             }}
             onClick={e => e.stopPropagation()}
           >
+            {/* Icon badge */}
             <div
               className="w-12 h-12 rounded-full flex items-center justify-center mx-auto"
               style={{ background: 'rgba(234,67,53,0.10)', border: '1px solid rgba(234,67,53,0.28)' }}
@@ -65,6 +86,7 @@ export default function SignOutDialog({ isOpen, onConfirm, onCancel, userName }:
               <ExitIcon className="w-5 h-5" style={{ color: 'var(--red)' }} />
             </div>
 
+            {/* Text block */}
             <div className="text-center space-y-1.5">
               <h2
                 id="signout-title"
@@ -74,7 +96,7 @@ export default function SignOutDialog({ isOpen, onConfirm, onCancel, userName }:
                 {t('signout.title')}
               </h2>
               {userName && (
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
                   {userName}
                 </p>
               )}
@@ -83,11 +105,14 @@ export default function SignOutDialog({ isOpen, onConfirm, onCancel, userName }:
               </p>
             </div>
 
+            {/* Action buttons */}
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={onCancel}
                 className="py-2.5 rounded-xl text-sm font-semibold transition-all"
                 style={{
+                  /* Light: soft neutral pill matching reference Cancel button.
+                     Dark:  subtle white-tinted glass button. */
                   background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
                   border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'}`,
                   color: 'var(--text-muted)',
