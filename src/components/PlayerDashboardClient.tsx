@@ -5,7 +5,7 @@ import { Participant, Badge } from '@/lib/db';
 import Header from '@/components/Header';
 import ProfileHeader from '@/components/ProfileHeader';
 import Dashboard from '@/components/Dashboard';
-import FacilitatorPanel from '@/components/FacilitatorPanel';
+import Leaderboard from '@/components/Leaderboard';
 import { ToastContainer } from '@/components/Toast';
 import { savePlayerAuth, touchPlayerAuth, clearPlayerAuth, pruneExpiredAuth } from '@/lib/localAuth';
 import { useLang } from '@/lib/LanguageContext';
@@ -68,7 +68,7 @@ export default function PlayerDashboardClient({ participant: initialP, badges: i
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-5 space-y-3">
         <ProfileHeader participant={participant} badges={badges} onSync={handleSync} savedUrl={profileUrl} onResetSession={handleSignOut} />
         {view==='dashboard'   && <Dashboard participant={participant} badges={badges} />}
-        {view==='leaderboard' && <FacilitatorPanel participants={participants} currentUser={participant} />}
+        {view==='leaderboard' && <Leaderboard participants={participants} currentUser={participant} />}
       </main>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
