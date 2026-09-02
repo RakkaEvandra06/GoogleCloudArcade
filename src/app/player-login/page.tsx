@@ -20,12 +20,12 @@ function useToast() {
 }
 
 const TRACK_IMGS = [
-  'https://cdn.qwiklabs.com/fRCfiQc6gVA%2BSEUkSvc7agSfPUGUiHmYaI4kslS9mSw%3D',
-  'https://cdn.qwiklabs.com/vQwBzyge8g7JI%2Fs9rWfu%2BvXJurcIOnP0A9wKR7U4i14%3D',
-  'https://cdn.qwiklabs.com/yn3KXIRZy6Md4qAEmKiYk6SEuHg0a7gDEaqc2H4o1Cs%3D',
-  'https://cdn.qwiklabs.com/nXo%2Bc%2FLavbtJXZma1hYLmBxApy6Cr6CZiR1Bnukj5dk%3D',
-  'https://cdn.qwiklabs.com/KU0Jp50XMAj26Vmx1iNYlmxJUltgvVVAa3YI0Xgssjg%3D',
-  'https://cdn.qwiklabs.com/jf0VYLPQlpqie%2FRI4cjTeBwtiL3xPto3PBIM5b8iSzI%3D',
+  'https://cdn.qwiklabs.com/KXGG8%2FBZ%2FW5ivwXBooBa3%2FLCB2za82JjOr1zYfqP1LU%3D',
+  'https://cdn.qwiklabs.com/jVPJBot7DE62xS8LxaCKKNWOBReLpBNYxgnMs%2Fo0oz0%3D',
+  'https://cdn.qwiklabs.com/SWHJmRzIRG3fdMsEEDM7Inb1kIIQTlnPenJWYzFKkjQ%3D',
+  'https://cdn.qwiklabs.com/wBqbircRabODpD75K0ny5IjjhDwlgKKJqUQFccERSjw%3D',
+  'https://cdn.qwiklabs.com/AE%2BsnGLXIiBTtfQFHTFFmjP8%2FQkK9nSWQqTlFWPMDn0%3D',
+  'https://cdn.qwiklabs.com/DR5zF8NaL8eWHyqXkGwR%2BOtzvaXD0qfqq6Ud3h0mgg0%3D',
 ];
 
 export default function PlayerLoginPage() {

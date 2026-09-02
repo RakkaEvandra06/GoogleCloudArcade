@@ -1,8 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Participant, Badge, SkillBadge } from '@/lib/db';
-import { CheckIcon, ExternalLinkIcon } from '@radix-ui/react-icons';
+import { ExternalLinkIcon as RadixExternal } from '@radix-ui/react-icons';
+import {
+  TierIcon, PlayIcon, StarIcon, TrendUpIcon, TrophyIcon,
+  CheckIcon, ArrowUpRightIcon, RefreshIcon, ExternalLinkIcon,
+  GridIcon, LayersIcon, BadgeIcon, ClockIcon, InfoIcon,
+  AlertIcon, SearchIcon,
+  type IconProps,
+} from '@/components/Icons';
+
+type ArcadeIcon = (p: IconProps) => React.ReactElement | null;
 import ActivityChart from '@/components/ActivityChart';
 import ActivityHeatmap from '@/components/ActivityHeatmap';
 import AccessCodeModal, { type TrackInfo } from '@/components/AccessCodeModal';
@@ -12,10 +21,10 @@ const ACTIVE_START = '2026-07-01';
 
 /* ─── ARCADE DATA ─────────────────────────────────────────── */
 const TIERS = [
-  { key: 'tier.legend',   min: 120, color: '#f9ab00', bg: 'rgba(249,171,0,0.10)',   border: 'rgba(249,171,0,0.28)',   emoji: '🏆' },
-  { key: 'tier.champion', min: 95,  color: '#a56ef5', bg: 'rgba(165,110,245,0.10)', border: 'rgba(165,110,245,0.28)', emoji: '👑' },
-  { key: 'tier.ranger',   min: 75,  color: '#4285f4', bg: 'rgba(66,133,244,0.10)',  border: 'rgba(66,133,244,0.28)',  emoji: '🎯' },
-  { key: 'tier.trooper',  min: 50,  color: '#34a853', bg: 'rgba(52,168,83,0.10)',   border: 'rgba(52,168,83,0.28)',   emoji: '🛡️' },
+  { key: 'tier.legend',   min: 120, color: '#f9ab00', bg: 'rgba(249,171,0,0.10)',   border: 'rgba(249,171,0,0.28)'   },
+  { key: 'tier.champion', min: 95,  color: '#a56ef5', bg: 'rgba(165,110,245,0.10)', border: 'rgba(165,110,245,0.28)' },
+  { key: 'tier.ranger',   min: 75,  color: '#4285f4', bg: 'rgba(66,133,244,0.10)',  border: 'rgba(66,133,244,0.28)'  },
+  { key: 'tier.trooper',  min: 50,  color: '#34a853', bg: 'rgba(52,168,83,0.10)',   border: 'rgba(52,168,83,0.28)'   },
 ];
 
 const MILESTONES = [
@@ -30,55 +39,55 @@ const JULY_TRACKS = [
   {
     id: 1, name: 'Arcade Base Camp', type: 'Base Camp', level: 'Beginner',
     fullName: 'Arcade Base Camp August 2026',
-    url: 'https://www.skills.google/games/7394',
-    accessCode: '1q-basecamp-10219',
+    url: 'https://www.skills.google/games/7444',
+    accessCode: '1q-basecamp-09304',
     desc: 'Develop key Google Cloud skills. No prior experience needed. Available in Spanish & Portuguese.',
-    img: 'https://cdn.qwiklabs.com/nXo%2Bc%2FLavbtJXZma1hYLmBxApy6Cr6CZiR1Bnukj5dk%3D',
+    img: 'https://cdn.qwiklabs.com/KXGG8%2FBZ%2FW5ivwXBooBa3%2FLCB2za82JjOr1zYfqP1LU%3D',
     levelColor: '#34a853',
   },  
   {
     id: 2, name: 'Arcade Trail', type: 'Trail', level: 'Beginner',
-    fullName: 'Arcade Trail: Cloud Delivery Systems',
-    url: 'https://www.skills.google/games/7396',
-    accessCode: '1q-delivery-31058',
-    desc: 'Admin Console, user provisioning, Google Meet and Google Classroom setup.',
-    img: 'https://cdn.qwiklabs.com/fRCfiQc6gVA%2BSEUkSvc7agSfPUGUiHmYaI4kslS9mSw%3D',
+    fullName: 'Arcade Trail: Data Engineering and Security',
+    url: 'https://www.skills.google/games/7443',
+    accessCode: '1q-vpcpeering-3469',
+    desc: 'Build stream high-volume data with Pub/Sub and Python Dataflow into Cloud Storage, then secure and manage the environment using Cloud KMS, asset cataloging, and VPC Peering.',
+    img: 'https://cdn.qwiklabs.com/jVPJBot7DE62xS8LxaCKKNWOBReLpBNYxgnMs%2Fo0oz0%3D',
     levelColor: '#34a853',
   },
   {
     id: 3, name: 'Arcade Voyage', type: 'Voyage', level: 'Intermediate',
-    fullName: 'Arcade Voyage: Google Sheets',
-    url: 'https://www.skills.google/games/7398',
-    accessCode: '1q-sheets-29185',
-    desc: 'Master Cloud Storage, Bucket Lock, and Sensitive Data Protection discovery at scale.',
-    img: 'https://cdn.qwiklabs.com/yn3KXIRZy6Md4qAEmKiYk6SEuHg0a7gDEaqc2H4o1Cs%3D',
+    fullName: 'Arcade Voyage: App Modernization',
+    url: 'https://www.skills.google/games/7442',
+    accessCode: '1q-microservice-9210',
+    desc: 'Build production-ready microservices, generate dynamic files, use Pub/Sub to decouple services, and deploy applications written in three different languages using App Engine.',
+    img: 'https://cdn.qwiklabs.com/SWHJmRzIRG3fdMsEEDM7Inb1kIIQTlnPenJWYzFKkjQ%3D',
     levelColor: '#4285f4',
   },
   {
     id: 4, name: 'Arcade Adventure', type: 'Adventure', level: 'Intermediate',
-    fullName: 'Arcade Adventure: Data Vault',
-    url: 'https://www.skills.google/games/7395',
-    accessCode: '1q-datamgt-92372',
-    desc: 'Build apps with AppSheet and deploy Cloud Run Functions — no heavy code required.',
-    img: 'https://cdn.qwiklabs.com/vQwBzyge8g7JI%2Fs9rWfu%2BvXJurcIOnP0A9wKR7U4i14%3D',
+    fullName: 'Arcade Adventure: Modern Cloud Architecture',
+    url: 'https://www.skills.google/games/7441',
+    accessCode: '1q-architecture-01381',
+    desc: 'Work with Pub/Sub, Cloud Storage, Cloud Run functions, IAM permissions, and real-time monitoring to build and secure a serverless data pipeline.',
+    img: 'https://cdn.qwiklabs.com/wBqbircRabODpD75K0ny5IjjhDwlgKKJqUQFccERSjw%3D',
     levelColor: '#4285f4',
   },
   {
     id: 5, name: 'Arcade Simulator', type: 'Simulator', level: 'Advanced',
-    fullName: 'Arcade Simulator: Network Security Engineer',
-    url: 'https://www.skills.google/games/7397',
-    accessCode: '1q-network-51470',
-    desc: 'BigQuery partitioned tables, Dataplex Knowledge Catalog, and decentralized data governance.',
-    img: 'https://cdn.qwiklabs.com/KU0Jp50XMAj26Vmx1iNYlmxJUltgvVVAa3YI0Xgssjg%3D',
+    fullName: 'Arcade Simulator: DevOps Engineer',
+    url: 'https://www.skills.google/games/7445',
+    accessCode: '1q-devops-065131',
+    desc: 'Build secure multi-VPC networks, configure access controls, and deploy multi-tier load balancers to create fast, scalable, and resilient environments.',
+    img: 'https://cdn.qwiklabs.com/AE%2BsnGLXIiBTtfQFHTFFmjP8%2FQkK9nSWQqTlFWPMDn0%3D',
     levelColor: '#ea4335',
   },
   {
-    id: 6, name: 'Spans and Plans', type: 'Special', level: 'Advanced',
-    fullName: 'Spans and Plans',
-    url: 'https://www.skills.google/games/7399',
-    accessCode: '1q-schema-27083',
-    desc: 'Security Command Center threat detection, GKE multi-tenant namespaces, and autoscaling.',
-    img: 'https://cdn.qwiklabs.com/jf0VYLPQlpqie%2FRI4cjTeBwtiL3xPto3PBIM5b8iSzI%3D',
+    id: 6, name: 'Pitch Perfect', type: 'Special', level: 'Advanced',
+    fullName: 'Pitch Perfect',
+    url: 'https://www.skills.google/games/7446',
+    accessCode: '1q-analysis-5026',
+    desc: 'Optimize Spanner schemas, use Pub/Sub for service communication, and deploy APIs with Cloud Run.',
+    img: 'https://cdn.qwiklabs.com/DR5zF8NaL8eWHyqXkGwR%2BOtzvaXD0qfqq6Ud3h0mgg0%3D',
     levelColor: '#ea4335',
   },
 ];
@@ -281,12 +290,14 @@ export default function Dashboard({ participant, badges }: Props) {
     <div className="space-y-3 animate-fade-slide-up" style={{ position:'relative', zIndex:1 }}>
       {/* Sub-tab bar */}
       <div className="flex gap-1 p-1 rounded-xl" style={{ background:'var(--surface)', border:'1px solid var(--border-md)' }}>
-        {([['overview', `⫶☰ ${t('dash.tab.overview')}`],['catalog', `ᯓ➤ ${t('dash.tab.fasttrack')}`],['badges', `🜲 ${t('dash.tab.mybadges')}`]] as [SubTab,string][]).map(([id,label]) => {
+        {([['overview', t('dash.tab.overview'), GridIcon],['catalog', t('dash.tab.fasttrack'), LayersIcon],['badges', t('dash.tab.mybadges'), BadgeIcon]] as [SubTab, string, ArcadeIcon][]).map(([id, label, TabIcon]) => {
           const active = activeTab === id;
           return (
             <button key={id} onClick={() => { setActiveTab(id); setPage(1); }}
-              className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200"
-              style={active ? { background:'var(--blue)', color:'#fff', boxShadow:'0 1px 4px rgba(0,0,0,0.25)' } : { color:'var(--text-muted)' }}>
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200"
+              style={active ? { background:'var(--blue)', color:'#fff', boxShadow:'0 1px 4px rgba(0,0,0,0.25)' } : { color:'var(--text-muted)' }}
+              aria-selected={active}>
+              <TabIcon size={12} aria-hidden="true" />
               {label}
             </button>
           );
@@ -342,7 +353,7 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
             <p className="text-[10px] font-mono font-bold uppercase tracking-widest mb-2" style={{ color: currentTier?.color ?? 'var(--text-muted)' }}>{t('dash.tiers_title')}</p>
             {currentTier ? (
               <div className="flex items-center gap-3">
-                <span className="text-3xl">{currentTier.emoji}</span>
+                <TierIcon tierKey={currentTier.key} size={32} color={currentTier.color} />
                 <div>
                   <div className="font-black text-2xl tracking-tight" style={{ color: currentTier.color }}>{t(currentTier.key)}</div>
                   <div className="text-xs font-mono mt-0.5" style={{ color:'var(--text-muted)' }}>{currentTier.min}+ {t('common.points_short')} {t('dash.pts_required')}</div>
@@ -375,8 +386,14 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
           <div className="mt-3 pt-3 space-y-1" style={{ borderTop:'1px solid var(--border)' }}>
             {TIERS.map(tier => (
               <div key={tier.key} className="flex items-center justify-between text-[10px] font-mono">
-                <span style={{ color: total >= tier.min ? tier.color : 'var(--text-dim)', fontWeight: total >= tier.min ? 700 : 400 }}>{tier.emoji} {t(tier.key)}</span>
-                <span style={{ color: total >= tier.min ? tier.color : 'var(--text-dim)' }}>{tier.min}+ {t('common.points_short')}{total >= tier.min ? ' ✓' : ''}</span>
+                <span className="flex items-center gap-1.5" style={{ color: total >= tier.min ? tier.color : 'var(--text-dim)', fontWeight: total >= tier.min ? 700 : 400 }}>
+                  <TierIcon tierKey={tier.key} size={11} color={total >= tier.min ? tier.color : 'var(--text-dim)'} />
+                  {t(tier.key)}
+                </span>
+                <span className="flex items-center gap-1" style={{ color: total >= tier.min ? tier.color : 'var(--text-dim)' }}>
+                  {tier.min}+ {t('common.points_short')}
+                  {total >= tier.min && <CheckIcon size={10} aria-hidden="true" />}
+                </span>
               </div>
             ))}
           </div>
@@ -599,8 +616,8 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
         <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 py-2.5 text-[10px] font-mono font-bold"
           style={{ borderTop:'1px solid var(--blue-border)', background:'rgba(0,0,0,0.12)' }}>
           <span style={{ color:'var(--foreground)' }}>{baseTotal} {t('catalog.stat.badges')}</span>
-          <span style={{ color:'var(--green)' }}>✓ {baseDoneCount} {t('catalog.stat.done')}</span>
-          <span style={{ color:'var(--red)' }}>⟳ {basePendingCount} {t('catalog.stat.pending')}</span>
+          <span className="flex items-center gap-1" style={{ color:'var(--green)' }}><CheckIcon size={11} aria-hidden="true" /> {baseDoneCount} {t('catalog.stat.done')}</span>
+          <span className="flex items-center gap-1" style={{ color:'var(--red)' }}><RefreshIcon size={11} aria-hidden="true" /> {basePendingCount} {t('catalog.stat.pending')}</span>
           <span style={{ color:'var(--yellow)' }}>+{(baseDoneCount * 0.5).toFixed(1)} {t('catalog.stat.pts_earned')}</span>
         </div>
       </div>
@@ -617,8 +634,8 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
                 style={active
                   ? { background: opt.bg, color: opt.color, boxShadow:'0 1px 4px rgba(0,0,0,0.25)' }
                   : { color:'var(--text-muted)' }}>
-                {opt.key === 'done'    && <span>✓</span>}
-                {opt.key === 'pending' && <span>⟳</span>}
+                {opt.key === 'done'    && <CheckIcon size={11} aria-hidden="true" />}
+                {opt.key === 'pending' && <RefreshIcon size={11} aria-hidden="true" />}
                 {opt.label}
                 <span className="ml-1 px-1.5 py-0.5 rounded-full text-[8px]"
                   style={{ background: active ? 'rgba(255,255,255,0.25)' : 'var(--border-md)', color: active ? opt.color : 'var(--text-muted)' }}>
@@ -704,14 +721,23 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
                     <span className="tag tag-gray text-[8px]">{CAT_LABELS[(s as any).cat] ?? (s as any).cat}</span>
                   )}
                   {s.labs !== undefined && s.labs > 0 && (
-                    <span className="tag tag-gray text-[8px]">⚠︎ {s.labs} labs</span>
+                    <span className="tag tag-gray text-[8px] flex items-center gap-0.5">
+                      <AlertIcon size={9} />
+                      {s.labs} labs
+                    </span>
                   )}
                   {s.duration && (
-                    <span className="tag tag-gray text-[8px]">⏱ {s.duration}</span>
+                    <span className="tag tag-gray text-[8px] flex items-center gap-0.5">
+                      <ClockIcon size={9} />
+                      {s.duration}
+                    </span>
                   )}
                   {(s as any).credits !== undefined && (s as any).credits > 0 && (
                     <span className="tag text-[8px]" style={{ background:'rgba(249,171,0,0.12)', color:'var(--yellow)', border:'1px solid rgba(249,171,0,0.28)' }}>
-                      ⓘ {(s as any).credits} cr
+                      <span className="flex items-center gap-0.5">
+                        <InfoIcon size={9} />
+                        {(s as any).credits} cr
+                      </span>
                     </span>
                   )}
                   {(s as any).credits === 0 && (
@@ -732,7 +758,7 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
                       color:      done ? 'var(--green)'       : 'var(--blue)',
                       border:     `1px solid ${done ? 'var(--green-border)' : 'var(--blue-border)'}`,
                     }}>
-                    {done ? 'Revisit ↗' : 'Start ↗'}
+                    <span className="flex items-center gap-1">{done ? t('catalog.revisit') : t('catalog.start')}<ArrowUpRightIcon size={11} aria-hidden="true" /></span>
                   </a>
                 </div>
               </div>
@@ -742,7 +768,13 @@ function CatalogTab({ paged, filtered, baseTotal, baseDoneCount, basePendingCoun
 
         {paged.length === 0 && (
           <div className="py-14 text-center rounded-xl" style={{ border:'1px dashed var(--border-md)' }}>
-            <p className="text-2xl mb-2">{status === 'done' ? '🎉' : status === 'pending' ? '📋' : '🔍'}</p>
+            <div className="flex flex-col items-center gap-1">
+              {status === 'done'
+                ? <CheckIcon size={28} style={{ color: 'var(--green)' }} aria-hidden="true" />
+                : status === 'pending'
+                ? <RefreshIcon size={28} style={{ color: 'var(--blue)' }} aria-hidden="true" />
+                : <SearchIcon size={28} />
+              }</div>
             <p className="text-sm font-semibold mb-1" style={{ color:'var(--foreground)' }}>
               {status === 'done' ? t('catalog.empty.no_done') : status === 'pending' ? t('catalog.empty.all_done') : t('catalog.empty.not_found')}
             </p>
@@ -854,7 +886,7 @@ function ProgressRow({ label, done, total, color }: { label:string; done:number;
     <div>
       <div className="flex justify-between text-[10px] font-mono mb-1">
         <span style={{ color: allDone ? color : 'var(--text-muted)' }}>{label}</span>
-        <span style={{ color: allDone ? color : 'var(--foreground)', fontWeight:700 }}>{done}/{total} {allDone && '✓'}</span>
+        <span className="flex items-center gap-1" style={{ color: allDone ? color : 'var(--foreground)', fontWeight:700 }}>{done}/{total} {allDone && <CheckIcon size={11} aria-hidden="true" />}</span>
       </div>
       <div className="h-1.5 rounded-full overflow-hidden" style={{ background:'var(--surface-hover)' }}>
         <div className="h-full rounded-full animate-progress" style={{ width:`${pct}%`, background: allDone ? color : `${color}88` }} />
