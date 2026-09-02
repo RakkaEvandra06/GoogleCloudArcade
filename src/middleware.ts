@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { COOKIE_NAME, SESSION_MAX_AGE } from '@/lib/session-constants';
 
+function getSessionSecret(): string {
+  const s = process.env.SESSION_SECRET;
+  const FALLBACK = 'change-this-default-secret-in-production';
+  const isPlaceholder =
+    !s ||
+    s.length < 32 ||
+    s.includes('change-this') ||
+    s.includes('your-random') ||
+    s.includes('placeholder') ||
+    s.includes('secret-here');
+  if (isPlaceholder) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(
+        '[middleware] SESSION_SECRET is not set or uses a placeholder. ' +
+        'Generate one with: openssl rand -base64 32',
+      );
+    }
+    // Return the same fallback used by session.ts so cookies can be verified
+    return FALLBACK;
+  }
+  return s;
+}
+
 async function getRole(cookieValue: string): Promise<string | null> {
   try {
     const dot = cookieValue.lastIndexOf('.');
@@ -11,7 +34,7 @@ async function getRole(cookieValue: string): Promise<string | null> {
     const enc  = new TextEncoder();
     const key  = await crypto.subtle.importKey(
       'raw',
-      enc.encode(process.env.SESSION_SECRET ?? 'change-this-default-secret-in-production'),
+      enc.encode(getSessionSecret()),  // FIX: no insecure fallback
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['verify'],

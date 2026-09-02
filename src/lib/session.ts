@@ -20,8 +20,17 @@ export interface ArcadeSession {
     createdAt: number;
 }
 
+const SECRET_FALLBACK = 'change-this-default-secret-in-production';
+
 function secret(): string {
-    return process.env.SESSION_SECRET ?? 'change-this-default-secret-in-production';
+  const s = process.env.SESSION_SECRET;
+  const isPlaceholder =
+    !s ||
+    s.includes('change-this') ||
+    s.includes('your-random') ||
+    s.includes('placeholder') ||
+    s.includes('secret-here');
+  return isPlaceholder ? SECRET_FALLBACK : s;
 }
 
 function sign(data: string): string {
