@@ -14,13 +14,27 @@ interface HeaderProps {
 }
 
 export default function Header({ currentView, onViewChange, isLoggedIn }: HeaderProps) {
-  const { theme, toggle } = useTheme();
-  const { t, lang, setLang } = useLang();
-  const isDark = theme === 'dark';
 
+  const { toggle } = useTheme();
+  const { t, lang, setLang } = useLang();
+
+  const [isDark,    setIsDark]    = useState(true); // SSR-safe default; corrected on first client effect
   const [time,      setTime]      = useState('');
   const [showLang,  setShowLang]  = useState(false);
   const langRef                   = useRef<HTMLDivElement>(null);
+
+  /* Reactively track data-theme on <html> */
+  useEffect(() => {
+    const sync = () =>
+      setIsDark(document.documentElement.getAttribute('data-theme') !== 'light');
+    sync(); // immediate correction on mount
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   /* Clock — Jakarta time */
   useEffect(() => {
