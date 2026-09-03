@@ -1,7 +1,10 @@
 'use client';
 import { useLang } from '@/lib/LanguageContext';
 import { useState, useEffect } from 'react';
-import { CheckIcon, CopyIcon, ExternalLinkIcon } from '@radix-ui/react-icons';
+import {
+  XIcon, CopyIcon, CheckIcon, ExternalLinkIcon,
+  InfoIcon,
+} from '@/components/Icons';
 
 export interface TrackInfo {
   id: number;
@@ -17,7 +20,7 @@ export interface TrackInfo {
 }
 
 interface Props {
-  track: TrackInfo; // always non-null — component only mounts when a track is selected
+  track: TrackInfo;
   onClose: () => void;
 }
 
@@ -25,14 +28,12 @@ export default function AccessCodeModal({ track, onClose }: Props) {
   const { t } = useLang();
   const [copied, setCopied] = useState(false);
 
-  /* Close on Escape */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  /* Lock background scroll */
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -56,20 +57,17 @@ export default function AccessCodeModal({ track, onClose }: Props) {
   };
 
   return (
-    /**
-     * ROOT — fixed full-screen container, just a stacking-context anchor.
-     */
-    <div className="fixed inset-0 z-[9999]" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[9999]" role="dialog" aria-modal="true" aria-labelledby="modal-title">
 
+      {/* Backdrop */}
       <div
         className="absolute inset-0 overflow-y-auto animate-backdrop-in"
         style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
         onClick={onClose}
       >
-
         <div className="flex min-h-full items-center justify-center p-4">
 
-          {/* CARD — stopPropagation prevents backdrop's onClick from firing */}
+          {/* Card */}
           <div
             className="relative w-full max-w-sm animate-pop-in"
             style={{
@@ -81,19 +79,22 @@ export default function AccessCodeModal({ track, onClose }: Props) {
             }}
             onClick={e => e.stopPropagation()}
           >
+
             {/* Close button */}
             <button
               onClick={onClose}
-              className="absolute top-3.5 right-3.5 w-7 h-7 rounded-full flex items-center justify-center font-mono text-xs transition-colors hover:opacity-70"
+              className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
               style={{
                 background: 'var(--surface-alt)',
                 color: 'var(--text-muted)',
                 border: '1px solid var(--border-md)',
               }}
-              aria-label="Close"
-            >✕</button>
+              aria-label="Close modal"
+            >
+              <XIcon size={13} />
+            </button>
 
-            {/* Badge image + title */}
+            {/* ── Badge image + title ── */}
             <div className="flex flex-col items-center text-center mb-5">
               <div
                 className="w-20 h-20 rounded-2xl flex items-center justify-center mb-3 overflow-hidden"
@@ -116,7 +117,7 @@ export default function AccessCodeModal({ track, onClose }: Props) {
               >
                 {track.type} · {track.level}
               </span>
-              <h3 className="font-black text-base leading-tight mb-0.5" style={{ color: 'var(--foreground)' }}>
+              <h3 id="modal-title" className="font-black text-base leading-tight mb-0.5" style={{ color: 'var(--foreground)' }}>
                 {track.name}
               </h3>
               <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
@@ -124,14 +125,15 @@ export default function AccessCodeModal({ track, onClose }: Props) {
               </p>
             </div>
 
-            {/* Description */}
+            {/* ── Description ── */}
             <p className="text-xs leading-relaxed mb-5 text-center" style={{ color: 'var(--text-muted)' }}>
               {track.desc}
             </p>
 
-            {/* Access code */}
+            {/* ── Access code block ── */}
             <div className="mb-5">
-              <p className="text-[9px] font-mono font-bold uppercase tracking-widest mb-2 text-center" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-[9px] font-mono font-bold uppercase tracking-widest mb-2 text-center"
+                style={{ color: 'var(--text-muted)' }}>
                 {t('modal.access.code')}
               </p>
               <div
@@ -157,20 +159,21 @@ export default function AccessCodeModal({ track, onClose }: Props) {
                     color: copied ? 'var(--green)' : 'var(--blue)',
                     border: `1px solid ${copied ? 'var(--green-border)' : 'var(--blue-border)'}`,
                   }}
-                  title="Copy access code"
+                  aria-label={copied ? 'Copied!' : 'Copy access code'}
                 >
-                  {copied ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
+                  {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
                 </button>
               </div>
               <p
-                className="text-[9px] font-mono text-center mt-2 transition-opacity"
+                className="text-[9px] font-mono text-center mt-2 flex items-center justify-center gap-1 transition-opacity"
                 style={{ color: 'var(--green)', opacity: copied ? 1 : 0, height: '1rem' }}
               >
-                ✓ Copied to clipboard!
+                <CheckIcon size={11} aria-hidden="true" />
+                Copied to clipboard!
               </p>
             </div>
 
-            {/* How to use */}
+            {/* ── How to use ── */}
             <div
               className="rounded-xl px-4 py-3 mb-5 text-[10px] font-mono"
               style={{
@@ -180,7 +183,10 @@ export default function AccessCodeModal({ track, onClose }: Props) {
                 lineHeight: 1.7,
               }}
             >
-              <p className="font-bold mb-1" style={{ color: 'var(--blue)' }}>{t('modal.how_to_use')}</p>
+              <p className="font-bold mb-2 flex items-center gap-1.5" style={{ color: 'var(--blue)' }}>
+                <InfoIcon size={12} aria-hidden="true" />
+                {t('modal.how_to_use')}
+              </p>
               <ol className="space-y-0.5 list-decimal list-inside">
                 <li>{t('modal.step1')}</li>
                 <li>{t('modal.step2')}</li>
@@ -189,7 +195,7 @@ export default function AccessCodeModal({ track, onClose }: Props) {
               </ol>
             </div>
 
-            {/* Action buttons */}
+            {/* ── Action buttons ── */}
             <div className="flex gap-2.5">
               <button onClick={onClose} className="btn-ghost flex-1 text-xs py-2.5">
                 {t('modal.close')}
@@ -199,7 +205,7 @@ export default function AccessCodeModal({ track, onClose }: Props) {
                 className="btn-primary flex-1 text-xs py-2.5 flex items-center justify-center gap-1.5"
                 style={{ background: track.levelColor, color: '#fff' }}
               >
-                <ExternalLinkIcon className="w-3.5 h-3.5" />
+                <ExternalLinkIcon size={13} aria-hidden="true" />
                 Open Google Skills
               </button>
             </div>
