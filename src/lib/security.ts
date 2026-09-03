@@ -1,4 +1,6 @@
 // ─── ALLOWED DOMAINS (SSRF allowlist) ────────────────────────────────────────
+import { timingSafeEqual } from 'crypto';
+
 const ALLOWED_PROFILE_HOSTNAMES = new Set([
   'cloudskillsboost.google.com',
   'www.cloudskillsboost.google.com',
@@ -62,6 +64,44 @@ export function logSecurity(
   }
 }
 
+// ─── STARTUP SECRET VALIDATION ───────────────────────────────────────────────
+// Call these once at boot (or on first use) to catch misconfigured deployments.
+
+const PLACEHOLDER_FRAGMENTS = [
+  'change-this',
+  'your-random',
+  'placeholder',
+  'secret-here',
+  'example',
+];
+
+function isPlaceholder(value: string): boolean {
+  const lower = value.toLowerCase();
+  return PLACEHOLDER_FRAGMENTS.some(f => lower.includes(f));
+}
+
+export function assertSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32 || isPlaceholder(secret)) {
+    throw new Error(
+      '[security] SESSION_SECRET is missing or uses a placeholder. ' +
+      'Set a cryptographically random value: openssl rand -base64 32',
+    );
+  }
+  return secret;
+}
+
+export function assertAdminSecret(): string {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret || secret.length < 16 || isPlaceholder(secret)) {
+    throw new Error(
+      '[security] ADMIN_SECRET is missing or uses a placeholder. ' +
+      'Set a high-entropy value: openssl rand -base64 24',
+    );
+  }
+  return secret;
+}
+
 // ─── SSRF PROTECTION ─────────────────────────────────────────────────────────
 
 export function validateProfileUrl(rawUrl: string): ValidationResult {
@@ -99,10 +139,6 @@ export function validateProfileUrl(rawUrl: string): ValidationResult {
   return { ok: true };
 }
 
-/**
- * Validates a URL that the scrape API is about to fetch.
- * Stricter than profile validation — also blocks redirects to internal hosts.
- */
 export function validateScrapeUrl(rawUrl: string): ValidationResult {
   const profileCheck = validateProfileUrl(rawUrl);
   if (!profileCheck.ok) return profileCheck;
@@ -164,7 +200,28 @@ export function validateParticipantInput(body: unknown): ValidationResult & {
   return { ok: true, profile_url: rawUrl, role };
 }
 
+export function isValidEmail(email: unknown): boolean {
+  if (typeof email !== 'string' || email.length > 254) return false;
+  // RFC-5321 minimal check — a proper library (e.g. zod) is preferred for stricter validation
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
+  // Reject well-known placeholder domains used in this codebase
+  const lower = email.toLowerCase();
+  return !lower.endsWith('@placeholder.com') && !lower.endsWith('@example.com');
+}
+
+// ─── HTML ESCAPING ─────────────────────────────────────────────────────────────
+
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ─── RATE LIMITING ────────────────────────────────────────────────────────────
+
 interface RateEntry { count: number; resetAt: number }
 const _rateMap = new Map<string, RateEntry>();
 
@@ -213,12 +270,14 @@ export function getClientIP(req: Request): string {
 }
 
 export function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  const maxLen = Math.max(aBuf.length, bBuf.length);
+  // Pad to equal length so timingSafeEqual runs for a consistent duration
+  const aPad = Buffer.concat([aBuf, Buffer.alloc(maxLen - aBuf.length)]);
+  const bPad = Buffer.concat([bBuf, Buffer.alloc(maxLen - bBuf.length)]);
+  // Run constant-time comparison, then also confirm lengths match (both must pass)
+  return timingSafeEqual(aPad, bPad) && aBuf.length === bBuf.length;
 }
 
 export function verifyCronSecret(req: Request): boolean {
@@ -236,7 +295,12 @@ export function verifyCronSecret(req: Request): boolean {
   return true;
 }
 
-// ─── SECURITY RESPONSE HEADERS ────────────────────────────────────────────────
+export function verifyInternalCronHeader(req: Request): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const header = req.headers.get('x-internal-cron-secret') ?? '';
+  return safeCompare(header, secret);
+}
 
 export const SECURITY_HEADERS: Record<string, string> = {
   'Strict-Transport-Security':       'max-age=63072000; includeSubDomains; preload',
@@ -247,7 +311,7 @@ export const SECURITY_HEADERS: Record<string, string> = {
   'Permissions-Policy':              'camera=(), microphone=(), geolocation=(), interest-cohort=()',
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline'",   // 'unsafe-eval' removed — see note above
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://cdn.qwiklabs.com https://storage.googleapis.com https://lh3.googleusercontent.com https://googleusercontent.com",
@@ -284,6 +348,13 @@ export function validateOrigin(req: Request): boolean {
     return true; // Permissive in dev
   }
 
+  // Always allow localhost / 127.0.0.1 in development mode.
+  if (process.env.NODE_ENV === 'development') {
+    const isLocal = (val: string | null) =>
+      !val || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(val);
+    if (isLocal(origin) && isLocal(referer)) return true;
+  }
+
   const allowed = new URL(appUrl).origin;
   if (origin && origin !== allowed) return false;
   if (referer) {
@@ -296,22 +367,24 @@ export function requestId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-import { getSession } from './session';
+import type { ArcadeSession } from './session';
 
 export async function requireFacilitatorSession(): Promise<
-  { session: Awaited<ReturnType<typeof getSession>> & { role: 'facilitator' }; error?: never } |
+  { session: ArcadeSession & { role: 'facilitator' }; error?: never } |
   { error: Response; session?: never }
 > {
+  const { getSession } = await import('./session');
   const s = await getSession();
   if (!s || s.role !== 'facilitator' || !s.facCode)
     return { error: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } }) };
-  return { session: s as NonNullable<Awaited<ReturnType<typeof getSession>>> & { role: 'facilitator' } };
+  return { session: s as ArcadeSession & { role: 'facilitator' } };
 }
 
 export async function requireAdminSession(): Promise<
-  { session: NonNullable<Awaited<ReturnType<typeof getSession>>>; error?: never } |
+  { session: ArcadeSession; error?: never } |
   { error: Response; session?: never }
 > {
+  const { getSession } = await import('./session');
   const s = await getSession();
   if (!s || s.role !== 'admin')
     return { error: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } }) };
