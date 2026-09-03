@@ -58,7 +58,7 @@ export interface SkillBadge {
 export interface Facilitator {
   code: string;
   name: string;
-  active: boolean;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -177,20 +177,20 @@ export async function setBadges(
 // ─── FACILITATOR FUNCTIONS ────────────────────────────────────────────────────
 export async function getFacilitatorByCode(code: string): Promise<Facilitator | null> {
   const { data, error } = await getClient()
-    .from('facilitators').select('*').eq('code', code.toUpperCase()).eq('active', true).maybeSingle();
+    .from('facilitator_codes').select('*').eq('code', code.toUpperCase()).eq('is_active', true).maybeSingle();
   if (error) throw error;
   return data;
 }
 
 export async function createFacilitatorCode(name: string, code: string): Promise<Facilitator | null> {
   const { data, error } = await getClient()
-    .from('facilitators').insert({ name, code: code.toUpperCase(), active: true }).select().maybeSingle();
+    .from('facilitator_codes').insert({ name, code: code.toUpperCase(), is_active: true }).select().maybeSingle();
   if (error) return null;
   return data;
 }
 
 export async function listFacilitatorCodes(): Promise<Facilitator[]> {
-  const { data, error } = await getClient().from('facilitators').select('*').order('created_at', { ascending: false });
+  const { data, error } = await getClient().from('facilitator_codes').select('*').order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
 }
@@ -198,7 +198,7 @@ export async function listFacilitatorCodes(): Promise<Facilitator[]> {
 export async function getFacilitatorMemberCount(facCode: string): Promise<number> {
   const { count, error } = await getClient()
     .from('facilitator_members').select('*', { count: 'exact', head: true }).eq('fac_code', facCode);
-  if (error) return 0;
+  if (error) throw error;
   return count ?? 0;
 }
 
@@ -363,7 +363,7 @@ export async function getGlobalStats(): Promise<GlobalStats> {
     db.from('badges').select('*', { count: 'exact', head: true }),
     db.from('badges').select('*', { count: 'exact', head: true }).eq('category', 'game'),
     db.from('badges').select('*', { count: 'exact', head: true }).eq('category', 'skill_badge'),
-    db.from('facilitators').select('*', { count: 'exact', head: true }).eq('active', true),
+    db.from('facilitator_codes').select('*', { count: 'exact', head: true }).eq('is_active', true),
   ]);
   return {
     totalParticipants: partRes.count ?? 0,
