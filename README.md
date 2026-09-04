@@ -9,12 +9,13 @@
   <img src="https://img.shields.io/badge/Supabase-2.x-3ECF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase"/>
   <img src="https://img.shields.io/badge/Deployed_on-Vercel-000000?style=flat-square&logo=vercel" alt="Vercel"/>
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="License"/>
+  <img src="https://img.shields.io/badge/i18n-EN_|_ID_|_JP-blueviolet?style=flat-square" alt="i18n"/> </p>
 </p>
 
 ---
 
 # 🎮 ArcadeTracker
-A web dashboard for monitoring the progress of Google Cloud Arcade participants featuring real-time point tracking, a tier system, and a comprehensive catalog of skill badges
+A full-stack web dashboard for **Google Cloud Arcade Festival (GCAF)** players featuring real-time point tracking, a tier system, and a comprehensive catalog of skill badges
 
 Paste your public Skills Boost profile URL and immediately see:
 - **Arcade Points** game badges (+1) and skill badges (+0.5) for the active period
@@ -33,8 +34,10 @@ Paste your public Skills Boost profile URL and immediately see:
 - **Active Game Tracks** 6 Arcade tracks complete with access codes
 - **Fast Track Catalog** 50+ GCAF 2026 skill badges that can be filtered by category, difficulty level, and completion status
 - **Badge History** “My Badges” tab displaying all earned badges, with current/archive filters and an activity heatmap
-- **Activity Chart** 
-Visual breakdown of badge earnings over time
+- **Activity Chart**  Visual breakdown of badge earnings over time
+- **Activity Heatmap** 26 week GitHub-style calendar heatmap of badge earning days
+- **Streak Counter** Current and all-time longest consecutive activity streak
+- **Leaderboard** Track your rank and compete with other players based on total points, badges earned, and milestone progress.
 
 ### 👩‍🏫 Facilitator Panel
 - **Member Management** View and manage all participants associated with a facilitator code
@@ -66,10 +69,10 @@ Total Points = Game Badges × 1 pt
 
 | Milestone | Game Badges | Skill Badges | Point Bonus |
 |---|---|---|---|
-| Milestone 1 | 1 | 7 | +5 points |
-| Milestone 2 | 3 | 14 | +15 points |
-| Achievement Milestone 3 | 8 | 28 | +25 points |
-| Highest Achievement Milestone | 12 | 42 | +40 points |
+| Milestone 1 | 6 | 14 | +7 points |
+| Milestone 2 | 8 | 28 | +18 points |
+| Achievement Milestone 3 | 10 | 42 | +29 points |
+| Highest Achievement Milestone | 12 | 56 | +40 points |
 
 ### Levels
 
@@ -77,8 +80,8 @@ Total Points = Game Badges × 1 pt
 |---|---|---|
 | Legend | 120+ |1|
 | Champion | 95+ |2|
-| Explorer | 75+ |3|
-|  Warrior | 50+ |4|
+| Ranger | 75+ |3|
+| Trooper | 50+ |4|
 
 
 ## 🚀 How to Run
@@ -86,7 +89,7 @@ Total Points = Game Badges × 1 pt
 ### Prerequisites
 - Node.js 18+
 - pnpm / npm / yarn
-- Supabase account (the free tier is sufficient)
+
 ### Installation Steps
 
 ```bash
@@ -103,93 +106,94 @@ npm install
 npm run dev
 ```
 
-> **Common error — `column facilitator_members.fac_code does not exist` (Postgres 42703)**
-> This means the `facilitator_members` table was created without the `fac_code` column.
-> Fix it by running the ALTER TABLE block at the bottom of `schema.sql` in the Supabase SQL Editor.
-
-## 🏗️ Project Structure
+## 📂 Project Structure
  
 ```
 ArcadeTracker/
 ├── src/
-│   ├── app/
-│   │   ├── admin/                     # Admin panel page
-│   │   ├── admin-login/               # Admin login page
-│   │   ├── facilitator/               # Facilitator dashboard page
-│   │   ├── facilitator-login/         # Facilitator login page
-│   │   ├── player-login/              # Player login page (Skills Boost URL input)
-│   │   ├── dashboard/                 # Player dashboard page
+│   ├── app/                          # Next.js App Router
+│   │   ├── admin/                    # Admin panel page
+│   │   ├── admin-login/              # Admin login page
+│   │   ├── facilitator/              # Facilitator dashboard page
+│   │   ├── facilitator-login/        # Facilitator login page
+│   │   ├── player-login/             # Player login (Skills Boost URL input)
+│   │   ├── dashboard/                # Player dashboard page
 │   │   ├── api/
 │   │   │   ├── auth/
-│   │   │   │   ├── login/             # POST — authenticate & create session cookie
-│   │   │   │   ├── logout/            # POST — destroy session (rate-limited)
-│   │   │   │   └── me/                # GET  — validate active session
+│   │   │   │   ├── login/            # POST — authenticate & create session cookie
+│   │   │   │   ├── logout/           # POST — destroy session (rate-limited)
+│   │   │   │   └── me/               # GET  — validate active session
 │   │   │   ├── participants/
-│   │   │   │   ├── route.ts           # GET  — list all participants (leaderboard)
-│   │   │   │   └── [id]/route.ts      # GET/PUT/DELETE — single participant CRUD
-│   │   │   ├── scrape/route.ts        # POST — scrape Skills Boost profile via Cheerio
-│   │   │   ├── skills/route.ts        # GET  — list all GCAF skill badges
-│   │   │   ├── feedback/route.ts      # POST — submit player feedback
+│   │   │   │   ├── route.ts          # GET  — list all participants (leaderboard)
+│   │   │   │   └── [id]/route.ts     # GET/PUT/DELETE — single participant CRUD
+│   │   │   ├── scrape/route.ts       # POST — scrape Skills Boost profile via Cheerio
+│   │   │   ├── skills/route.ts       # GET  — list all GCAF skill badges
+│   │   │   ├── feedback/route.ts     # POST — submit player feedback
 │   │   │   ├── facilitator/
-│   │   │   │   ├── batches/           # GET/POST — CSV import batch management
-│   │   │   │   ├── email/             # POST — send emails to selected members
-│   │   │   │   ├── import/            # POST — bulk CSV participant import
-│   │   │   │   └── members/           # GET/POST/DELETE — facilitator member management
+│   │   │   │   ├── batches/          # GET/POST — CSV import batch management
+│   │   │   │   ├── email/            # POST — send emails to selected members
+│   │   │   │   ├── import/           # POST — bulk CSV participant import
+│   │   │   │   └── members/          # GET/POST/DELETE — member management
 │   │   │   ├── admin/
-│   │   │   │   ├── stats/             # GET  — global statistics
-│   │   │   │   ├── facilitators/      # GET/POST/DELETE — facilitator code management
-│   │   │   │   ├── audit-logs/        # GET  — paginated audit trail
-│   │   │   │   ├── master-sync/       # POST — bulk sync all participants
-│   │   │   │   └── maintenance/       # POST — toggle maintenance mode
+│   │   │   │   ├── stats/            # GET  — global statistics
+│   │   │   │   ├── facilitators/     # GET/POST/DELETE — facilitator code management
+│   │   │   │   ├── audit-logs/       # GET  — paginated audit trail
+│   │   │   │   ├── master-sync/      # POST — bulk sync all participants
+│   │   │   │   └── maintenance/      # POST — toggle maintenance mode
 │   │   │   └── cron/
-│   │   │       ├── sync-participants/ # Scheduled: sync all badge data (16:00 UTC)
+│   │   │       ├── sync-participants/   # Scheduled: sync badge data (16:00 UTC)
 │   │   │       └── refresh-leaderboard/ # Scheduled: rebuild rankings (16:30 UTC)
-│   │   ├── globals.css                # Global styles & Tailwind design tokens
-│   │   ├── layout.tsx                 # Root layout with metadata and providers
-│   │   └── page.tsx                   # Root redirect (→ /player-login)
+│   │   ├── globals.css                  # Global styles & Tailwind design tokens
+│   │   ├── layout.tsx                   # Root layout with metadata and providers
+│   │   └── page.tsx                     # Root redirect (→ /player-login)
 │   │
 │   ├── components/
-│   │   ├── Dashboard.tsx              # Player dashboard (Overview / Catalog / Badges tabs)
-│   │   ├── DashboardSkeleton.tsx      # Loading skeleton for the player dashboard
-│   │   ├── FacilitatorDashboard.tsx   # Facilitator dashboard (members, import, email, history)
-│   │   ├── FacilitatorPanel.tsx       # Leaderboard panel for facilitators
-│   │   ├── AdminPanel.tsx             # Full admin control panel
-│   │   ├── ProfileHeader.tsx          # Participant avatar, name, tier badge, points
-│   │   ├── ActivityChart.tsx          # Badge activity chart
-│   │   ├── ActivityHeatmap.tsx        # 26-week calendar heatmap
-│   │   ├── AccessCodeModal.tsx        # Modal for game track access codes
-│   │   ├── Header.tsx                 # Navigation bar with theme toggle & language switcher
-│   │   ├── PlayerShell.tsx            # Wrapper layout for player-facing pages
-│   │   ├── PlayerDashboardClient.tsx  # Client-side state manager for player dashboard
-│   │   ├── Providers.tsx              # Global context providers (theme, language)
-│   │   ├── SignOutDialog.tsx          # Confirmation dialog for sign-out
-│   │   └── Toast.tsx                  # Toast notification system
+│   │   ├── Dashboard.tsx             # Player dashboard (Overview / Catalog / Badges tabs)
+│   │   ├── DashboardSkeleton.tsx     # Loading skeleton for player dashboard
+│   │   ├── FacilitatorPanel.tsx      # Facilitator dashboard (members, import, email, history)
+│   │   ├── Leaderboard.tsx           # Leaderboard panel for Players
+│   │   ├── AdminPanel.tsx            # Full admin control panel
+│   │   ├── ProfileHeader.tsx         # Avatar, name, tier badge, points, sync button
+│   │   ├── ActivityChart.tsx         # Badge activity bar/line chart
+│   │   ├── ActivityHeatmap.tsx       # 26-week calendar heatmap
+│   │   ├── AccessCodeModal.tsx       # Modal for game track access codes
+│   │   ├── Header.tsx                # Navigation bar with theme + language toggle
+│   │   ├── PlayerShell.tsx           # Layout wrapper for player-facing pages
+│   │   ├── Icons.tsx                 # SVG 
+│   │   ├── PlayerDashboardClient.tsx # Client-side state for player dashboard
+│   │   ├── Providers.tsx             # Global context providers (theme, language)
+│   │   ├── SignOutDialog.tsx         # Confirmation dialog for sign-out
+│   │   ├── ThemeLangToggle.tsx       # Combined dark/light + language switcher
+│   │   ├── ThemeToggle.tsx           # Dark/light mode toggle button
+│   │   └── Toast.tsx                 # Toast notification system
 │   │
 │   ├── lib/
-│   │   ├── db.ts                      # Supabase client + all database query functions
-│   │   ├── i18n.ts                    # Full internationalization string map
-│   │   ├── LanguageContext.tsx        # React context for language switching
-│   │   ├── localAuth.ts               # Local (admin) credential validation
-│   │   ├── security.ts                # Rate limiting, CSRF, and input sanitization
-│   │   ├── session.ts                 # HMAC session creation and verification
-│   │   ├── session-constants.ts       # Cookie name and max-age constants (Edge-safe)
-│   │   ├── supabase-client.ts         # Browser-side Supabase client (anon key)
-│   │   └── useTheme.ts                # Dark/light theme hook with localStorage persistence
+│   │   ├── db.ts                     # Supabase client + all database query functions
+│   │   ├── i18n.ts                   # Full i18n string map (EN / ID / JP)
+│   │   ├── LanguageContext.tsx       # React context for language switching
+│   │   ├── localAuth.ts              # LocalStorage-based facilitator auth persistence
+│   │   ├── security.ts               # Rate limiting, CSRF, SSRF, input sanitization
+│   │   ├── session.ts                # HMAC session creation and verification
+│   │   ├── session-constants.ts      # Cookie name and max-age constants (Edge-safe)
+│   │   ├── streak.ts                 # Consecutive-day streak computation + localStorage cache
+│   │   ├── supabase-client.ts        # Browser-side Supabase client (anon key)
+│   │   ├── ThemeContext.tsx          # React context for dark/light theme
+│   │   └── useTheme.ts               # Dark/light theme hook with localStorage persistence
 │   │
-│   └── middleware.ts                  # Edge Middleware — role-based route protection
+│   └── middleware.ts                 # Edge Middleware — role-based route protection
 │
 ├── public/
-│   ├── icon.png                       # App icon / favicon
-│   ├── OpenGraph.png                  # Social share preview image
-│   └── 500px.png                      # Additional image asset
+│   ├── banner.svg                    # Repository banner
+│   ├── icon.png                      # App icon / favicon
+│   └── OpenGraph.png                 # Social share preview image
 │
-├── .env.local                         # Local environment variables (never commit)
-├── eslint.config.mjs                  # ESLint configuration
-├── postcss.config.mjs                 # PostCSS config for Tailwind
-├── tsconfig.json                      # TypeScript configuration
-├── vercel.json                        # Vercel deployment + cron job config
-├── package.json                       # Dependencies and npm scripts
-└── LICENSE.txt                        # MIT License
+├── .env.local                        # Local environment variables (never commit)
+├── eslint.config.mjs                 # ESLint configuration
+├── next.config.ts                    # Next.js config: security headers, image hosts
+├── postcss.config.mjs                # PostCSS config for Tailwind
+├── tsconfig.json                     # TypeScript configuration
+├── vercel.json                       # Vercel deployment config + cron job schedules
+└── package.json                      # Dependencies and npm scripts
 ```
 
 ## 🤝 Contributing
