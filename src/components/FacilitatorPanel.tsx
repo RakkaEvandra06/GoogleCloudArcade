@@ -1,285 +1,505 @@
 'use client';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { Participant, UploadBatch } from '@/lib/db';
 import { useLang } from '@/lib/LanguageContext';
+import SignOutDialog from '@/components/SignOutDialog';
+import ThemeLangToggle from '@/components/ThemeLangToggle';
+import { saveFacAuth, loadFacAuth, clearFacAuth, pruneExpiredAuth } from '@/lib/localAuth';
+import {
+  GridIcon, UsersIcon, UploadIcon, ClockIcon, MailIcon,
+  RefreshIcon, LogOutIcon, CheckCircleIcon, XIcon,
+  SearchIcon, FileIcon, AlertIcon, StatusDot,
+  type IconProps,
+} from '@/components/Icons';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Participant } from '@/lib/db';
-import { getSupabaseBrowser } from '@/lib/supabase-client';
-import { UpdateIcon } from '@radix-ui/react-icons';
+type ArcadeIcon = (p: IconProps) => React.ReactElement | null;
+type Tab = 'overview' | 'members' | 'import' | 'history' | 'email';
 
-interface Props {
-  participants: Participant[];
-  currentUser?: Participant | null;
-}
+const TIERS = [{ name: 'Legend', min: 120 }, { name: 'Champion', min: 95 }, { name: 'Ranger', min: 75 }, { name: 'Trooper', min: 50 }];
+function tier(pts: number) { return TIERS.find(t => pts >= t.min)?.name ?? 'Unranked'; }
 
-const TIERS = [
-  { name: 'Legend',   min: 120, color: '#fbbf24', emoji: '🏆' },
-  { name: 'Champion', min: 95,  color: '#c084fc', emoji: '👑' },
-  { name: 'Ranger',   min: 75,  color: '#22d3ee', emoji: '🎯' },
-  { name: 'Trooper',  min: 50,  color: '#4ade80', emoji: '🛡️' },
+const TAB_META: { id: Tab; Icon: ArcadeIcon; labelKey: string }[] = [
+  { id: 'overview', Icon: GridIcon,    labelKey: 'fac.tab.overview' },
+  { id: 'members',  Icon: UsersIcon,   labelKey: 'fac.tab.members'  },
+  { id: 'import',   Icon: UploadIcon,  labelKey: 'fac.tab.import'   },
+  { id: 'history',  Icon: ClockIcon,   labelKey: 'fac.tab.history'  },
+  { id: 'email',    Icon: MailIcon,    labelKey: 'fac.tab.email'    },
 ];
 
-function getTier(pts: number) {
-  return TIERS.find(t => pts >= t.min) ?? null;
-}
-
-function timeAgo(iso: string | undefined | null) {
-  if (!iso) return '—';
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  const h = Math.floor(diff / 3600000);
-  const d = Math.floor(diff / 86400000);
-  if (d > 0) return `${d}d ago`;
-  if (h > 0) return `${h}h ago`;
-  if (m > 0) return `${m}m ago`;
-  return 'just now';
-}
-
-export default function FacilitatorPanel({ participants: initial, currentUser }: Props) {
+export default function FacilitatorDashboard({ facName }: { facName: string }) {
+  const router = useRouter();
+  const [tab,           setTab]           = useState<Tab>('overview');
+  const [members,       setMembers]       = useState<Participant[]>([]);
+  const [batches,       setBatches]       = useState<UploadBatch[]>([]);
+  const [search,        setSearch]        = useState('');
+  const [locked,        setLocked]        = useState(false);
+  const [syncId,        setSyncId]        = useState<string | null>(null);
+  const [note,          setNote]          = useState<string | null>(null);
+  const [csvPrev,       setCsvPrev]       = useState<{ url: string; valid: boolean; dup: boolean }[]>([]);
+  const [csvFile,       setCsvFile]       = useState('');
+  const [importing,     setImporting]     = useState(false);
+  const [emailSubject,  setEmailSubject]  = useState('');
+  const [selected,      setSelected]      = useState<Set<string>>(new Set());
+  const [sending,       setSending]       = useState(false);
+  const [showSignOut,   setShowSignOut]   = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const { t } = useLang();
-  const [participants, setParticipants] = useState<Participant[]>(initial);
-  const [isLive, setIsLive]             = useState(false);
-  const [lastPing, setLastPing]         = useState<string>('');
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [filter, setFilter]             = useState('');
 
-  const fetchParticipants = useCallback(async () => {
-    try {
-      const res  = await fetch('/api/participants');
-      const data = await res.json();
-      if (Array.isArray(data.participants)) {
-        setParticipants(data.participants);
-        setLastPing(new Date().toLocaleTimeString());
-      }
-    } catch { /* silent */ }
+  const [isDark, setIsDark] = useState(true);
+  useEffect(() => {
+    const sync = () => setIsDark(document.documentElement.getAttribute('data-theme') !== 'light');
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
   }, []);
 
-  const refresh = async () => {
-    setIsRefreshing(true);
-    await fetchParticipants();
-    setIsRefreshing(false);
+  const toast = (m: string) => { setNote(m); setTimeout(() => setNote(null), 3500); };
+
+  useEffect(() => { if (!emailSubject) setEmailSubject(t('fac.email.default_subj')); }, [t]);
+  const loadMembers = useCallback(async () => { const r = await fetch('/api/facilitator/members'); if (r.ok) { const d = await r.json(); setMembers(d.members ?? []); } }, []);
+  const loadBatches = useCallback(async () => { const r = await fetch('/api/facilitator/batches'); if (r.ok) { const d = await r.json(); setBatches(d.batches ?? []); } }, []);
+  useEffect(() => { pruneExpiredAuth(); const s = loadFacAuth(); if (s?.code) saveFacAuth(s.code, facName); loadMembers(); }, [loadMembers, facName]);
+  useEffect(() => { if (tab === 'history') loadBatches(); }, [tab, loadBatches]);
+
+  const syncMember = async (id: string) => {
+    if (locked) { toast(t('toast.fac.locked')); return; }
+    setSyncId(id);
+    const r = await fetch(`/api/participants/${id}`, { method: 'POST' });
+    setSyncId(null);
+    r.ok ? (toast(t('toast.fac.synced')), loadMembers()) : toast(t('toast.fac.sync_fail'));
   };
+  const syncAll = async () => {
+    if (locked) { toast(t('toast.fac.locked')); return; }
+    setLocked(true); toast(t('toast.fac.syncing_all'));
+    for (const m of members) { await fetch(`/api/participants/${m.id}`, { method: 'POST' }); await new Promise<void>(r => setTimeout(r, 1000)); }
+    setLocked(false); toast(t('toast.fac.all_synced').replace('{n}', String(members.length))); loadMembers();
+  };
+  const removeMember = async (id: string) => {
+    await fetch(`/api/facilitator/members?id=${id}`, { method: 'DELETE' });
+    setMembers(m => m.filter(x => x.id !== id)); toast(t('toast.fac.removed'));
+  };
+  const handleCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      const txt = ev.target?.result as string;
+      setCsvFile(f.name);
+      const lines = txt.split('\n').map(l => l.trim()).filter(Boolean);
+      const skip = lines[0]?.toLowerCase().includes('url') ? 1 : 0;
+      const urls = lines.slice(skip).map(l => l.split(',').pop()?.trim() ?? l.trim()).filter(u => u.includes('/public_profiles/'));
+      const existing = new Set(members.map(m => m.profile_url));
+      setCsvPrev(urls.map(url => ({ url, valid: url.includes('/public_profiles/'), dup: existing.has(url) })));
+    };
+    r.readAsText(f);
+  };
+  const doImport = async () => {
+    const rows = csvPrev.filter(r => r.valid && !r.dup).map(r => r.url);
+    if (!rows.length) { toast(t('fac.import.no_valid')); return; }
+    setImporting(true);
+    const res = await fetch('/api/facilitator/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows, file_name: csvFile }) });
+    setImporting(false);
+    if (res.ok) { const d = await res.json(); toast(t('toast.fac.import_ok').replace('{ok}', String(d.successful)).replace('{total}', String(rows.length))); setCsvPrev([]); setCsvFile(''); loadMembers(); }
+    else toast(t('toast.fac.import_fail'));
+  };
+  const rollback = async (id: string) => {
+    const r = await fetch(`/api/facilitator/batches?id=${id}`, { method: 'DELETE' });
+    r.ok ? (toast(t('toast.fac.rollback_ok')), loadBatches(), loadMembers()) : toast(t('toast.fac.rollback_fail'));
+  };
+  const sendEmails = async () => {
+    if (!selected.size) { toast(t('toast.fac.select_first')); return; }
+    setSending(true);
+    const r = await fetch('/api/facilitator/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ member_ids: [...selected], subject: emailSubject }) });
+    setSending(false);
+    if (r.ok) { const d = await r.json(); toast(t('toast.fac.email_sent').replace('{n}', String(d.sent))); setSelected(new Set()); }
+    else { const d = await r.json().catch(() => ({ error: '' })); toast(d.error || t('toast.fac.email_fail')); }
+  };
+  const signOut = async () => { await fetch('/api/auth/logout', { method: 'POST' }); router.push('/facilitator-login'); };
 
-  // Supabase real-time subscription
-  useEffect(() => {
-    const sb = getSupabaseBrowser();
-    if (!sb) {
-      // Fallback: poll every 30s
-      const id = setInterval(fetchParticipants, 30_000);
-      return () => clearInterval(id);
-    }
+  const filtered = members.filter(m => !search || m.name.toLowerCase().includes(search.toLowerCase()) || m.profile_url.includes(search));
 
-    const ch = sb
-      .channel('leaderboard-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, () => {
-        fetchParticipants();
-        setLastPing(new Date().toLocaleTimeString());
-      })
-      .subscribe((status) => {
-        setIsLive(status === 'SUBSCRIBED');
-      });
-
-    return () => { sb.removeChannel(ch); };
-  }, [fetchParticipants]);
-
-  const sorted = [...participants]
-    .filter(p => !filter || p.name.toLowerCase().includes(filter.toLowerCase()))
-    .sort((a, b) => (b.monthly_points ?? 0) - (a.monthly_points ?? 0));
-
-  const top3 = sorted.slice(0, 3);
+  const navBg = isDark ? 'rgba(13,19,25,0.95)' : 'rgba(249,250,252,0.96)';
+  const navBd = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
 
   return (
-    <div className="space-y-4 animate-fade-slide-up">
-      {/* Header */}
-      <div className="glass-card" style={{ background:'rgba(192,132,252,0.04)', borderColor:'rgba(192,132,252,0.18)', boxShadow:'4px 4px 0 var(--purple), 0 0 20px rgba(192,132,252,0.12)' }}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color:'var(--purple)' }}>🗺 Global Leaderboard</p>
-            <p className="font-mono text-xs" style={{ color:'var(--text-muted)' }}>
-              {participants.length} participant{participants.length !== 1 ? 's' : ''} · GCAF 2026 · Jul 13 – Sep 14
-            </p>
-          </div>
+    <div className="min-h-dvh" style={{ position: 'relative', zIndex: 1 }}>
+
+      {/* ── Navbar ── */}
+      <div className="w-full sticky top-0 z-50"
+        style={{ background: navBg, backdropFilter: 'saturate(180%) blur(18px)', borderBottom: `1px solid ${navBd}`, boxShadow: isDark ? '0 1px 0 rgba(255,255,255,0.03)' : '0 1px 0 rgba(0,0,0,0.05)' }}>
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            {/* Live indicator */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style={{ background: isLive ? 'rgba(74,222,128,0.10)' : 'rgba(100,116,139,0.12)', border:`1px solid ${isLive ? 'rgba(74,222,128,0.3)' : 'rgba(100,116,139,0.2)'}` }}>
-              <span className={`w-2 h-2 rounded-full ${isLive ? 'animate-live-blip' : 'opacity-40'}`} style={{ background: isLive ? 'var(--success)' : 'var(--text-muted)' }} />
-              <span className="font-mono text-[9px] font-bold uppercase tracking-widest" style={{ color: isLive ? 'var(--success)' : 'var(--text-muted)' }}>
-                {isLive ? 'Live' : 'Polling'}
-              </span>
-              {lastPing && <span className="font-mono text-[9px]" style={{ color:'var(--text-muted)' }}>· {lastPing}</span>}
+            <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0"
+              style={{ border: '1px solid rgba(52,168,83,0.45)', background: 'rgba(52,168,83,0.10)' }}>
+              <img src="/500px.png" alt="" className="w-full h-full object-cover" />
             </div>
-            <button onClick={refresh} disabled={isRefreshing} className="btn-ghost text-[9px] px-3 py-1.5">
-              <UpdateIcon className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm" style={{ color: 'var(--foreground)' }}>{t('fac.panel_title')}</span>
+              <span className="font-mono text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(52,168,83,0.12)', color: 'var(--green)', border: '1px solid rgba(52,168,83,0.28)' }}>
+                {facName}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {locked && (
+              <span className="flex items-center gap-1 tag tag-red text-[9px]">
+                <AlertIcon size={10} aria-hidden="true" />
+                {t('fac.locked')}
+              </span>
+            )}
+            <ThemeLangToggle />
+            <button onClick={() => setShowSignOut(true)}
+              className="flex items-center gap-1.5 btn-ghost text-[9px] px-3 py-1.5">
+              <LogOutIcon size={11} aria-hidden="true" />
+              {t('profile.sign_out')}
             </button>
           </div>
         </div>
+
+        {/* Tab bar */}
+        <div className="max-w-6xl mx-auto px-4 flex overflow-x-auto no-scrollbar"
+          style={{ borderTop: `1px solid ${navBd}` }} role="tablist">
+          {TAB_META.map(({ id, Icon, labelKey }) => (
+            <button key={id} role="tab" aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-colors"
+              style={{
+                color: tab === id ? 'var(--green)' : 'var(--text-muted)',
+                background: 'transparent', border: 'none',
+                borderBottom: `2px solid ${tab === id ? 'var(--green)' : 'transparent'}`,
+              }}>
+              <Icon size={12} aria-hidden="true" />
+              {t(labelKey)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Podium (top 3) */}
-      {top3.length >= 3 && (
-        <div className="glass-card">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-widest mb-4" style={{ color:'var(--gold)' }}>🥇 Top Performers</p>
-          <div className="flex items-end justify-center gap-4">
-            {/* 2nd */}
-            <PodiumSlot rank={2} p={top3[1]} isMe={top3[1]?.id === currentUser?.id} />
-            {/* 1st */}
-            <PodiumSlot rank={1} p={top3[0]} isMe={top3[0]?.id === currentUser?.id} />
-            {/* 3rd */}
-            <PodiumSlot rank={3} p={top3[2]} isMe={top3[2]?.id === currentUser?.id} />
-          </div>
+      <SignOutDialog isOpen={showSignOut} userName={facName} onCancel={() => setShowSignOut(false)} onConfirm={async () => { setShowSignOut(false); await signOut(); }} />
+
+      {/* Toast */}
+      {note && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-2.5 rounded-xl font-mono text-xs font-bold animate-toast-in"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border-md)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', color: 'var(--foreground)' }}>
+          {note}
         </div>
       )}
 
-      {/* Full table */}
-      <div className="glass-card" style={{ padding:'1rem' }}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 px-2">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color:'var(--text-muted)' }}>All Participants</p>
-          <input
-            type="text"
-            placeholder="Search by name…"
-            value={filter}
-            onChange={e => setFilter(e.target.value)}
-            className="glass-input py-2 text-xs w-full sm:w-48"
-          />
-        </div>
+      <main className="max-w-6xl mx-auto px-4 py-6 space-y-4">
 
-        {/* Table header */}
-        <div className="grid font-mono text-[9px] font-bold uppercase tracking-widest px-3 py-2 mb-1 rounded-lg"
-          style={{ gridTemplateColumns:'2rem 1fr 5rem 4rem 4rem 4rem', background:'rgba(255,255,255,0.04)', color:'var(--text-muted)' }}>
-          <span>#</span>
-          <span>Name</span>
-          <span className="text-right">{t('lb.points')}</span>
-          <span className="text-right">Games</span>
-          <span className="text-right">Skills</span>
-          <span className="text-right">Synced</span>
-        </div>
-
-        <div className="space-y-1 max-h-[520px] overflow-y-auto no-scrollbar">
-          {sorted.map((p, i) => {
-            const pts   = p.monthly_points ?? 0;
-            const tier  = getTier(pts);
-            const isMe  = p.id === currentUser?.id;
-            const rank  = i + 1;
-            const medalColor = rank === 1 ? '#fbbf24' : rank === 2 ? '#94a3b8' : rank === 3 ? '#b87333' : undefined;
-
-            return (
-              <div key={p.id}
-                className="grid items-center px-3 py-2.5 rounded-xl transition-all duration-200 font-mono"
-                style={{
-                  gridTemplateColumns: '2rem 1fr 5rem 4rem 4rem 4rem',
-                  background: isMe ? 'rgba(34,211,238,0.06)' : rank <= 3 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
-                  border: isMe ? '1px solid rgba(34,211,238,0.3)' : rank <= 3 ? '1px solid rgba(255,255,255,0.09)' : '1px solid transparent',
-                  boxShadow: isMe ? '2px 2px 0 rgba(34,211,238,0.2)' : undefined,
-                }}>
-
-                {/* Rank */}
-                <span className="text-[10px] font-black" style={{ color: medalColor ?? 'var(--text-muted)' }}>
-                  {rank <= 3 ? (['🥇','🥈','🥉'][rank-1]) : rank}
-                </span>
-
-                {/* Name */}
-                <div className="flex items-center gap-2 min-w-0">
-                  <Avatar name={p.name} avatarUrl={p.avatar_url} size={24} color={tier?.color} />
-                  <div className="min-w-0">
-                    <span className="text-xs font-bold truncate block" style={{ color: isMe ? 'var(--primary)' : 'var(--foreground)' }}>
-                      {p.name} {isMe && <span className="font-mono text-[9px]" style={{ color:'var(--primary)' }}>(you)</span>}
-                    </span>
-                    {tier && (
-                      <span className="text-[9px] font-bold" style={{ color: tier.color }}>{tier.emoji} {tier.name}</span>
-                    )}
-                  </div>
+        {/* ── Overview ── */}
+        {tab === 'overview' && (
+          <div className="space-y-4 animate-fade-slide-up">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                [t('fac.stat.total'),  members.length,                                                                                                          'var(--blue)'],
+                [t('fac.stat.avg'),    members.length ? (members.reduce((s, m) => s + (m.monthly_points ?? 0), 0) / members.length).toFixed(1) : '0',          'var(--yellow)'],
+                [t('fac.stat.today'),  members.filter(m => m.last_synced && new Date(m.last_synced).toDateString() === new Date().toDateString()).length,        'var(--green)'],
+                [t('fac.stat.50pts'),  members.filter(m => (m.monthly_points ?? 0) >= 50).length,                                                              'var(--purple)'],
+              ].map(([l, v, c]) => (
+                <div key={l as string} className="glass-card text-center py-4">
+                  <p className="font-black text-3xl font-mono" style={{ color: c as string }}>{v as any}</p>
+                  <p className="font-mono text-[10px] uppercase tracking-widest mt-1" style={{ color: 'var(--text-muted)' }}>{l as string}</p>
                 </div>
-
-                {/* Points */}
-                <span className="text-right text-sm font-black" style={{ color: tier?.color ?? 'var(--foreground)' }}>{pts.toFixed(1)}</span>
-
-                {/* Games */}
-                <span className="text-right text-xs font-bold" style={{ color:'var(--primary)' }}>
-                  {/* We don't have per-row badge counts in the participants list, show placeholder */}
-                  —
-                </span>
-
-                {/* Skills */}
-                <span className="text-right text-xs font-bold" style={{ color:'var(--purple)' }}>—</span>
-
-                {/* Synced */}
-                <span className="text-right text-[9px]" style={{ color:'var(--text-muted)' }}>
-                  {timeAgo(p.last_synced)}
-                </span>
-              </div>
-            );
-          })}
-
-          {sorted.length === 0 && (
-            <div className="py-12 text-center">
-              <p className="font-mono text-xs" style={{ color:'var(--text-muted)' }}>No participants found.</p>
+              ))}
             </div>
-          )}
-        </div>
 
-        {/* Totals */}
-        {participants.length > 0 && (
-          <div className="mt-4 pt-3 flex flex-wrap gap-4" style={{ borderTop:'1px solid rgba(255,255,255,0.07)' }}>
-            <Stat label="Participants" value={participants.length} color="var(--foreground)" />
-            <Stat label="Avg Points" value={(participants.reduce((s,p) => s+(p.monthly_points??0),0)/participants.length).toFixed(1)} color="var(--gold)" />
-            <Stat label="Top Score" value={(Math.max(...participants.map(p=>p.monthly_points??0))).toFixed(1)} color="var(--primary)" />
-            {(() => {
-              const legends = participants.filter(p=>(p.monthly_points??0)>=120).length;
-              return legends > 0 ? <Stat label="Legends" value={legends} color="#fbbf24" /> : null;
-            })()}
+            {/* Tier distribution */}
+            <div className="glass-card">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>{t('fac.tier_dist')}</p>
+              {TIERS.map(tt => {
+                const c = members.filter(m => (m.monthly_points ?? 0) >= tt.min).length;
+                const pct = members.length ? Math.round((c / members.length) * 100) : 0;
+                return (
+                  <div key={tt.name} className="mb-2.5">
+                    <div className="flex justify-between font-mono text-[10px] mb-1">
+                      <span style={{ color: 'var(--foreground)' }}>{tt.name}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{c} ({pct}%)</span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-alt)' }}>
+                      <div className="h-full rounded-full animate-progress" style={{ width: `${pct}%`, background: 'var(--blue)' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Milestone progress */}
+            <div className="glass-card">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>{t('fac.ms_progress_full')}</p>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  [t('fac.ms.m1'),       t('fac.ms.m1_threshold'),  15,  'var(--green)'],
+                  [t('fac.ms.m2'),       t('fac.ms.m2_threshold'),  25,  'var(--blue)'],
+                  [t('fac.ms.ultimate'), t('fac.ms.ult_threshold'), 50,  'var(--yellow)'],
+                ].map(([l, d, min, c]) => {
+                  const cnt = members.filter(m => (m.monthly_points ?? 0) >= (min as number)).length;
+                  return (
+                    <div key={l as string} className="text-center p-3 rounded-xl"
+                      style={{ background: 'var(--surface-alt)', border: '1px solid var(--border-md)' }}>
+                      <p className="font-black text-2xl font-mono" style={{ color: c as string }}>{cnt}</p>
+                      <p className="font-mono text-[9px] font-bold uppercase mt-0.5" style={{ color: 'var(--foreground)' }}>{l}</p>
+                      <p className="font-mono text-[8px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{d}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Setup hint when no real-time */}
-      {!isLive && (
-        <div className="px-4 py-3 rounded-xl font-mono text-[10px]" style={{ background:'rgba(251,191,36,0.06)', border:'1px solid rgba(251,191,36,0.2)', color:'var(--gold)' }}>
-          ⚡ Add <code style={{ background:'rgba(255,255,255,0.08)', padding:'1px 4px', borderRadius:3 }}>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to your .env.local to enable real-time leaderboard updates.
-        </div>
-      )}
-    </div>
-  );
-}
+        {/* ── Members ── */}
+        {tab === 'members' && (
+          <div className="space-y-3 animate-fade-slide-up">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <SearchIcon size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2"
+                  style={{ color: 'var(--text-dim)' }} aria-hidden="true" />
+                <input value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder={t('fac.members.search')} className="glass-input py-2 text-xs pl-8 w-full" />
+              </div>
+              <button onClick={syncAll} disabled={locked}
+                className="btn-cyan text-[9px] px-4 py-2 whitespace-nowrap flex items-center gap-1.5">
+                <RefreshIcon size={11} className={locked ? 'animate-spin' : ''} aria-hidden="true" />
+                {locked ? t('fac.members.syncing') : t('fac.members.sync_all_n').replace('{n}', String(members.length))}
+              </button>
+            </div>
 
-function PodiumSlot({ rank, p, isMe }: { rank: 1|2|3; p: Participant; isMe: boolean }) {
-  const pts    = p.monthly_points ?? 0;
-  const tier   = getTier(pts);
-  const HEIGHT = rank === 1 ? 80 : rank === 2 ? 64 : 52;
-  const SCALE  = rank === 1 ? 1.1 : 1;
-  const MEDAL  = ['🥇','🥈','🥉'][rank-1];
-  const BORDER = rank === 1 ? 'rgba(251,191,36,0.4)' : rank === 2 ? 'rgba(148,163,184,0.4)' : 'rgba(184,115,51,0.4)';
+            <div className="glass-card" style={{ padding: '0.75rem' }}>
+              {/* Table header */}
+              <div className="grid font-mono text-[9px] font-bold uppercase tracking-widest px-3 py-2 mb-1 rounded-lg"
+                style={{ gridTemplateColumns: '1fr 5rem 5rem 5.5rem 7rem', background: 'var(--surface-alt)', color: 'var(--text-muted)' }}>
+                <span>{t('fac.members.col.name')}</span>
+                <span className="text-right">{t('fac.members.col.pts')}</span>
+                <span className="text-right">{t('fac.members.col.tier')}</span>
+                <span className="text-right">{t('fac.members.col.synced')}</span>
+                <span className="text-right">{t('fac.members.col.action')}</span>
+              </div>
+              <div className="space-y-1 max-h-[480px] overflow-y-auto no-scrollbar">
+                {filtered.map(m => (
+                  <div key={m.id} className="grid items-center px-3 py-2.5 rounded-xl"
+                    style={{ gridTemplateColumns: '1fr 5rem 5rem 5.5rem 7rem', background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
+                    <div className="min-w-0">
+                      <p className="font-medium text-xs truncate" style={{ color: 'var(--foreground)' }}>{m.name || '—'}</p>
+                      <p className="font-mono text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>{m.profile_url}</p>
+                    </div>
+                    <span className="text-right font-mono text-xs font-bold" style={{ color: 'var(--yellow)' }}>{(m.monthly_points ?? 0).toFixed(1)}</span>
+                    <span className="text-right font-mono text-[9px]" style={{ color: 'var(--blue)' }}>{tier(m.monthly_points ?? 0)}</span>
+                    <span className="text-right font-mono text-[9px]" style={{ color: 'var(--text-muted)' }} suppressHydrationWarning>
+                      {m.last_synced ? new Date(m.last_synced).toLocaleDateString() : t('fac.members.never')}
+                    </span>
+                    <div className="flex justify-end gap-1.5">
+                      <button onClick={() => syncMember(m.id)} disabled={syncId === m.id || locked}
+                        className="btn-cyan text-[8px] px-2 py-1 flex items-center gap-1" aria-label={`Sync ${m.name}`}>
+                        <RefreshIcon size={10} className={syncId === m.id ? 'animate-spin' : ''} aria-hidden="true" />
+                      </button>
+                      <button onClick={() => removeMember(m.id)}
+                        className="flex items-center justify-center w-6 h-6 rounded font-mono font-bold"
+                        style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-border)' }}
+                        aria-label={`Remove ${m.name}`}>
+                        <XIcon size={9} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {!filtered.length && (
+                  <div className="py-10 text-center">
+                    <p className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{t('fac.members.empty')}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
-  return (
-    <div className="flex flex-col items-center gap-2" style={{ transform:`scale(${SCALE})`, transformOrigin:'bottom center' }}>
-      <Avatar name={p.name} avatarUrl={p.avatar_url} size={40} color={tier?.color} />
-      <div className="text-center">
-        <p className="font-mono text-[10px] font-black uppercase tracking-wider truncate max-w-[80px]" style={{ color: isMe ? 'var(--primary)' : 'var(--foreground)' }}>{p.name.split(' ')[0]}</p>
-        <p className="font-mono text-xs font-black" style={{ color: tier?.color ?? 'var(--gold)' }}>{pts.toFixed(1)}</p>
-      </div>
-      <div
-        className="w-16 flex items-center justify-center rounded-t-lg font-mono text-lg font-black"
-        style={{ height:HEIGHT, background:`${BORDER.replace('0.4','0.08')}`, border:`2px solid ${BORDER}`, borderBottom:'none', boxShadow:`inset 0 2px 0 ${BORDER}` }}>
-        {MEDAL}
-      </div>
-    </div>
-  );
-}
+        {/* ── Import ── */}
+        {tab === 'import' && (
+          <div className="space-y-4 animate-fade-slide-up">
+            <div className="glass-card space-y-3">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5"
+                style={{ color: 'var(--blue)' }}>
+                <UploadIcon size={12} aria-hidden="true" />
+                {t('fac.import.title')}
+              </p>
+              <div className="p-3 rounded-lg font-mono text-[9px]"
+                style={{ background: 'var(--surface-alt)', border: '1px dashed var(--border-md)', color: 'var(--text-muted)' }}>
+                <p className="font-bold mb-1">{t('fac.import.csv_format')}</p>
+                <p>{t('fac.import.csv_label')}</p>
+                <p>https://www.skills.google/public_profiles/xxx</p>
+              </div>
+              <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleCsv} className="hidden" />
+              <button onClick={() => fileRef.current?.click()}
+                className="btn-cyan w-full text-xs py-3 flex items-center justify-center gap-2">
+                <FileIcon size={13} aria-hidden="true" />
+                {csvFile ? csvFile : t('fac.import.choose_file')}
+              </button>
+            </div>
 
-function Avatar({ name, avatarUrl, size, color }: { name:string; avatarUrl?:string|null; size:number; color?:string }) {
-  const initials = name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
-  return (
-    <div className="rounded-full flex items-center justify-center font-bold shrink-0 overflow-hidden"
-      style={{ width:size, height:size, background:`${color ?? '#22d3ee'}20`, border:`2px solid ${color ?? '#22d3ee'}60`, fontSize:size*0.35, color: color ?? '#22d3ee', boxShadow:`0 0 8px ${color ?? '#22d3ee'}30` }}>
-      {avatarUrl ? <img src={avatarUrl} alt={name} className="w-full h-full object-cover" onError={e=>{(e.currentTarget as HTMLImageElement).style.display='none';}} /> : initials}
-    </div>
-  );
-}
+            {csvPrev.length > 0 && (
+              <div className="glass-card space-y-3">
+                <div className="flex justify-between items-center">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                    {t('fac.import.preview_n').replace('{n}', String(csvPrev.length))}
+                  </p>
+                  <div className="flex gap-3 font-mono text-[9px]">
+                    <span className="flex items-center gap-1" style={{ color: 'var(--green)' }}>
+                      <StatusDot color="var(--green)" size={6} />
+                      {t('fac.import.new_count').replace('{n}', String(csvPrev.filter(r => r.valid && !r.dup).length))}
+                    </span>
+                    <span className="flex items-center gap-1" style={{ color: 'var(--yellow)' }}>
+                      <StatusDot color="var(--yellow)" size={6} />
+                      {t('fac.import.dup_count').replace('{n}', String(csvPrev.filter(r => r.dup).length))}
+                    </span>
+                    <span className="flex items-center gap-1" style={{ color: 'var(--red)' }}>
+                      <StatusDot color="var(--red)" size={6} />
+                      {t('fac.import.invalid_count').replace('{n}', String(csvPrev.filter(r => !r.valid).length))}
+                    </span>
+                  </div>
+                </div>
+                <div className="max-h-48 overflow-y-auto no-scrollbar space-y-1">
+                  {csvPrev.slice(0, 40).map((r, i) => (
+                    <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-lg"
+                      style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
+                      <StatusDot
+                        color={r.dup ? 'var(--yellow)' : r.valid ? 'var(--green)' : 'var(--red)'}
+                        size={7}
+                      />
+                      <span className="font-mono text-[9px] truncate"
+                        style={{ color: r.dup ? 'var(--yellow)' : r.valid ? 'var(--green)' : 'var(--red)' }}>
+                        {r.url}
+                      </span>
+                      {r.dup && <span className="tag tag-gold text-[7px] shrink-0">{t('fac.import.dup_tag')}</span>}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={doImport}
+                  disabled={importing || csvPrev.filter(r => r.valid && !r.dup).length === 0}
+                  className="btn-primary w-full text-xs py-2.5 flex items-center justify-center gap-2">
+                  {importing ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 rounded-full animate-spin"
+                        style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
+                      {t('fac.import.importing')}
+                    </>
+                  ) : (
+                    <>
+                      <UploadIcon size={13} aria-hidden="true" />
+                      {t('fac.import.btn_n').replace('{n}', String(csvPrev.filter(r => r.valid && !r.dup).length))}
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
-function Stat({ label, value, color }: { label:string; value:string|number; color:string }) {
-  return (
-    <div className="flex flex-col items-center px-4 py-2 rounded-lg" style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-      <span className="font-mono text-sm font-black" style={{ color }}>{value}</span>
-      <span className="font-mono text-[9px] uppercase tracking-widest mt-0.5" style={{ color:'var(--text-muted)' }}>{label}</span>
+        {/* ── History ── */}
+        {tab === 'history' && (
+          <div className="glass-card animate-fade-slide-up space-y-3">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5"
+              style={{ color: 'var(--text-muted)' }}>
+              <ClockIcon size={12} aria-hidden="true" />
+              {t('fac.history.title')}
+            </p>
+            {batches.length === 0 && (
+              <p className="text-center text-xs py-8" style={{ color: 'var(--text-muted)' }}>{t('fac.history.empty')}</p>
+            )}
+            {batches.map(b => (
+              <div key={b.id} className="flex items-center justify-between gap-3 p-3 rounded-xl"
+                style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', opacity: b.rolled_back ? 0.5 : 1 }}>
+                <div className="min-w-0">
+                  <p className="font-mono text-xs font-bold truncate flex items-center gap-1.5"
+                    style={{ color: 'var(--foreground)' }}>
+                    <FileIcon size={11} aria-hidden="true" />
+                    {b.file_name}
+                  </p>
+                  <p className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }} suppressHydrationWarning>
+                    {new Date(b.created_at).toLocaleString()} · {b.total} {t('fac.history.total')} ·{' '}
+                    <span style={{ color: 'var(--green)' }}>{b.successful} {t('fac.history.ok')}</span> ·{' '}
+                    <span style={{ color: 'var(--red)' }}>{b.failed} {t('fac.history.failed')}</span>
+                  </p>
+                </div>
+                {b.rolled_back
+                  ? <span className="tag tag-gray text-[8px]">{t('fac.history.rolled')}</span>
+                  : (
+                    <button onClick={() => rollback(b.id)}
+                      className="text-[8px] px-3 py-1.5 rounded-lg font-mono font-bold whitespace-nowrap flex items-center gap-1"
+                      style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-border)' }}>
+                      <XIcon size={9} aria-hidden="true" />
+                      {t('fac.history.rollback')}
+                    </button>
+                  )
+                }
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Email ── */}
+        {tab === 'email' && (
+          <div className="space-y-3 animate-fade-slide-up">
+            <div className="glass-card space-y-3">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5"
+                style={{ color: 'var(--blue)' }}>
+                <MailIcon size={12} aria-hidden="true" />
+                {t('fac.email.title')}
+              </p>
+              <div>
+                <label className="font-mono text-[9px] font-bold uppercase tracking-widest block mb-1.5"
+                  style={{ color: 'var(--text-muted)' }}>{t('fac.email.subject')}</label>
+                <input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="glass-input py-2 text-xs" />
+              </div>
+              <div className="flex justify-between items-center">
+                <p className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('fac.email.select_lbl')}</p>
+                <button
+                  onClick={() => setSelected(s => s.size === members.length ? new Set() : new Set(members.map(m => m.id)))}
+                  className="btn-ghost text-[9px] px-2 py-1">
+                  {selected.size === members.length ? t('fac.email.deselect_all_btn') : t('fac.email.select_all_btn')}
+                </button>
+              </div>
+              <div className="max-h-56 overflow-y-auto no-scrollbar space-y-1">
+                {members.map(m => (
+                  <label key={m.id}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer"
+                    style={{
+                      background: selected.has(m.id) ? 'var(--blue-dim)' : 'var(--surface-alt)',
+                      border: `1px solid ${selected.has(m.id) ? 'var(--blue-border)' : 'var(--border)'}`,
+                    }}>
+                    <input type="checkbox" checked={selected.has(m.id)}
+                      onChange={e => { setSelected(s => { const n = new Set(s); e.target.checked ? n.add(m.id) : n.delete(m.id); return n; }); }}
+                      className="accent-blue-500" />
+                    <span className="font-mono text-xs truncate" style={{ color: 'var(--foreground)' }}>
+                      {m.name || m.profile_url}
+                    </span>
+                    <span className="font-mono text-[9px] ml-auto" style={{ color: 'var(--yellow)' }}>
+                      {(m.monthly_points ?? 0).toFixed(1)} pts
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('fac.email.resend_note')}</p>
+              <button onClick={sendEmails} disabled={sending || selected.size === 0}
+                className="btn-primary w-full text-xs py-2.5 flex items-center justify-center gap-2">
+                {sending ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 rounded-full animate-spin"
+                      style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
+                    {t('fac.email.sending')}
+                  </>
+                ) : (
+                  <>
+                    <MailIcon size={13} aria-hidden="true" />
+                    {t('fac.email.send_n').replace('{n}', String(selected.size))}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
