@@ -5,8 +5,8 @@ export async function GET() {
   try {
     const skills = await getSkillBadges();
     return NextResponse.json({ skills });
-  } catch (error: any) {
-    console.error('GET skills error:', error);
+  } catch (error: unknown) {
+    console.error('[skills] fetch error:', error instanceof Error ? error.message : 'unknown');
     return NextResponse.json({ error: 'Gagal mengambil data skill.' }, { status: 500 });
   }
 }
