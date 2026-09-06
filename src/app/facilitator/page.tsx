@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
-import FacilitatorDashboard from '@/components/FacilitatorDashboard';
+import FacilitatorPanel from '@/components/FacilitatorPanel';
 
 export default async function FacilitatorPage() {
   const session = await getSession();
   if (!session || session.role !== 'facilitator') redirect('/facilitator-login');
-  return <FacilitatorDashboard facName={session.facName ?? 'Facilitator'} />;
+  return <FacilitatorPanel facName={session.facName ?? 'Facilitator'} />;
 }
