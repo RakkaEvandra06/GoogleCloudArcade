@@ -3,10 +3,12 @@ import { getSession } from '@/lib/session';
 import { getFacilitatorMembers, addFacilitatorMember, removeFacilitatorMember, getParticipantByUrl, addParticipant, createAuditLog } from '@/lib/db';
 import { validateProfileUrl, sanitizeString, validateUUID, checkRateLimit, getClientIP } from '@/lib/security';
 export const dynamic = 'force-dynamic';
-async function authFac(req: Request) { const s = await getSession(); return s?.role === 'facilitator' ? s : null; }
+async function authFac(_req: Request) { const s = await getSession(); return s?.role === 'facilitator' ? s : null; }
 
-export async function GET() {
-  const s = await authFac(null as any);
+export async function GET(req: Request) {
+  // Previously called authFac(null as any) — if getSession() reads from the
+  // request object (cookies/headers), passing null silently breaks auth.
+  const s = await authFac(req);
   if (!s) return NextResponse.json({ error:'Unauthorized' }, { status:401 });
   const members = await getFacilitatorMembers(s.facCode!);
   return NextResponse.json({ members });
