@@ -1,12 +1,25 @@
 import { NextResponse } from 'next/server';
-import { getParticipants, getBadges, updateParticipant } from '@/lib/db';
+import { getParticipants, getBadges, updateParticipant, getSystemSetting, setSystemSetting } from '@/lib/db';
 import { verifyCronSecret, validateUUID, logSecurity } from '@/lib/security';
 
 /** Periode aktif Arcade 2026 */
 const ACTIVE_START = '2026-07-01';
 
-const MIN_INTERVAL_MS = 5 * 60 * 1_000;
-let lastRunAt = 0;
+// ── Serverless-safe deduplication ─────────────────────────────────────────────
+// Module-level `lastRunAt` doesn't work in serverless — each warm instance
+// has independent memory. Use a Supabase row as shared state instead.
+const DEDUP_KEY    = 'cron_refresh_leaderboard_last_run';
+const MIN_INTERVAL = 5 * 60 * 1_000;
+
+async function shouldRun(): Promise<boolean> {
+  const stored  = await getSystemSetting(DEDUP_KEY);
+  const lastRun = stored ? Number(stored) : 0;
+  return isNaN(lastRun) || Date.now() - lastRun >= MIN_INTERVAL;
+}
+
+async function markRan(): Promise<void> {
+  await setSystemSetting(DEDUP_KEY, String(Date.now()));
+}
 
 export const dynamic = 'force-dynamic';
 export const runtime  = 'nodejs';
@@ -18,14 +31,13 @@ export async function GET(request: Request) {
   }
 
   /* ── Deduplication guard ──────────────────────────────────────────── */
-  const now = Date.now();
-  if (now - lastRunAt < MIN_INTERVAL_MS) {
+  if (!(await shouldRun())) {
     return NextResponse.json(
       { message: 'Sudah berjalan baru-baru ini. Coba lagi nanti.' },
       { status: 429 },
     );
   }
-  lastRunAt = now;
+  await markRan();
 
   /* ── Fetch all participants ───────────────────────────────────────── */
   let participants: Awaited<ReturnType<typeof getParticipants>>;
@@ -65,9 +77,10 @@ export async function GET(request: Request) {
 
     try {
       const badges  = await getBadges(p.id);
-      const active  = badges.filter(b => b.earned_date >= ACTIVE_START);
-      const games   = active.filter(b => b.category === 'game').length;
-      const skills  = active.filter(b => b.category === 'skill_badge').length;
+      type B = (typeof badges)[number];
+      const active  = badges.filter((b: B) => b.earned_date >= ACTIVE_START);
+      const games   = active.filter((b: B) => b.category === 'game').length;
+      const skills  = active.filter((b: B) => b.category === 'skill_badge').length;
       const points  = games + skills * 0.5;
 
       await updateParticipant(p.id, { monthly_points: points });
@@ -87,10 +100,11 @@ export async function GET(request: Request) {
   /* ── Build fresh leaderboard snapshot ────────────────────────────── */
   try {
     const fresh = await getParticipants();       // re-fetch setelah update
+    type P = (typeof fresh)[number];
     result.leaderboard = fresh
-      .sort((a, b) => (b.monthly_points ?? 0) - (a.monthly_points ?? 0))
+      .sort((a: P, b: P) => (b.monthly_points ?? 0) - (a.monthly_points ?? 0))
       .slice(0, 50)
-      .map((p, i) => ({
+      .map((p: P, i: number) => ({
         rank:   i + 1,
         name:   p.name,
         points: p.monthly_points ?? 0,
