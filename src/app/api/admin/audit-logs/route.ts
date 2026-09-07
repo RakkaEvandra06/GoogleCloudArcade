@@ -10,7 +10,9 @@ export async function GET(req: Request) {
   const ip = getClientIP(req);
   if (!checkRateLimit(`audit-logs:${ip}`, 20, 60)) return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429 });
   const { searchParams } = new URL(req.url);
-  const limit  = Math.min(100, Math.max(1, parseInt(searchParams.get('limit')  ?? '50')));
-  const offset = Math.max(0,              parseInt(searchParams.get('offset') ?? '0'));
+  const limit  = Math.min(100,    Math.max(1, parseInt(searchParams.get('limit')  ?? '50')));
+  // Cap offset — an unbounded value forces Postgres to scan and discard
+  // arbitrarily many rows, making this a cheap authenticated DoS.
+  const offset = Math.min(10_000, Math.max(0, parseInt(searchParams.get('offset') ?? '0')));
   return NextResponse.json({ logs: await getAuditLogs(limit, offset) });
 }
