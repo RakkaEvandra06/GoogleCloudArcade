@@ -15,15 +15,27 @@ const FEATURE_ICONS = [ChartBarIcon, UploadIcon, ClockIcon, MailIcon];
 export default function FacilitatorLoginPage() {
   const router = useRouter();
   const { t, lang } = useLang();
-  const [code,      setCode]      = useState('');
-  const [loading,   setLoad]      = useState(false);
-  const [err,       setErr]       = useState('');
-  const [savedAuth, setSavedAuth] = useState<{ code: string; name?: string; savedAt: number } | null>(null);
+  const initFac = typeof window !== 'undefined' ? loadFacAuth() : null;
+  const [code,           setCode]           = useState(initFac?.code ?? '');
+  const [loading,        setLoad]           = useState(false);
+  const [err,            setErr]            = useState('');
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [savedAuth, setSavedAuth] = useState<{ code: string; name?: string; savedAt: number } | null>(initFac);
 
   useEffect(() => {
     pruneExpiredAuth();
-    const stored = loadFacAuth();
-    if (stored) { setSavedAuth(stored); setCode(stored.code); }
+    (async () => {
+      try {
+        const meRes = await fetch('/api/auth/me');
+        if (!meRes.ok) { setSessionChecked(true); return; }
+        const { session } = await meRes.json();
+        if (session?.role === 'facilitator') {
+          router.push('/facilitator'); return;
+        }
+      } catch { /* Show login form on any error */ }
+      setSessionChecked(true);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,12 +43,19 @@ export default function FacilitatorLoginPage() {
     if (!code.trim()) return;
     setErr(''); setLoad(true);
     try {
-      const res  = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'facilitator', code: code.trim().toUpperCase() }) });
+      const res  = await fetch('/api/auth/login', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ type: 'facilitator', code: code.trim().toUpperCase() }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t('common.error'));
       saveFacAuth(code.trim().toUpperCase(), data.name);
       router.push('/facilitator');
-    } catch (e: unknown) { setErr(e instanceof Error ? e.message : t('common.error')); setLoad(false); }
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : t('common.error'));
+      setLoad(false);
+    }
   };
 
   const features: Record<Lang, string[]> = {
@@ -44,6 +63,16 @@ export default function FacilitatorLoginPage() {
     ID: ['Dashboard statistik anggota & milestone', 'Import CSV dengan validasi duplikat', 'Sync individu & massal + riwayat upload', 'Progress report via email (Resend)'],
     JP: ['メンバー統計ダッシュボード＆マイルストーン', '重複検証付きCSVインポート', '個別・一括同期＋アップロード履歴', 'メール（Resend）による進捗レポート'],
   };
+
+  // Show spinner while checking for an existing session
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center" style={{ position: 'relative', zIndex: 1 }}>
+        <span className="w-5 h-5 border-2 rounded-full animate-spin"
+          style={{ borderColor: 'var(--border-md)', borderTopColor: 'var(--green)' }} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
