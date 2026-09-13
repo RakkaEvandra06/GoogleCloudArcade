@@ -6,7 +6,6 @@ import Header from '@/components/Header';
 import { ToastContainer } from '@/components/Toast';
 import { savePlayerAuth, loadPlayerAuth, clearPlayerAuth, pruneExpiredAuth, authExpiresIn, type PlayerAuth } from '@/lib/localAuth';
 import { useLang } from '@/lib/LanguageContext';
-import type { Lang } from '@/lib/i18n';
 
 interface ToastItem { id: string; message: string; type: 'success'|'error'|'info'; }
 function useToast() {
@@ -30,16 +29,17 @@ const TRACK_IMGS = [
 
 export default function PlayerLoginPage() {
   const router = useRouter();
-  const { t, lang } = useLang();
-  const [profileUrl,     setProfileUrl]     = useState('');
+  const { t } = useLang();
+  const initPlayer = typeof window !== 'undefined' ? loadPlayerAuth() : null;
+  const [profileUrl,     setProfileUrl]     = useState(initPlayer?.url ?? '');
   const [isLoading,      setLoading]        = useState(false);
   const [loadingMsg,     setLoadingMsg]     = useState('');
   const [loadingStep,    setLoadingStep]    = useState(0);
   const [sessionChecked, setSessionChecked] = useState(false);
-  const [savedAuth,      setSavedAuth]      = useState<PlayerAuth | null>(null);
+  const [savedAuth,      setSavedAuth]      = useState<PlayerAuth | null>(initPlayer);
   const { toasts, add: addToast, remove: removeToast } = useToast();
 
-  const STEPS = (l: Lang) => [
+  const STEPS = () => [
     t('player.step.1'), t('player.step.2'), t('player.step.3'),
     t('player.step.4'), t('player.step.5'),
   ];
@@ -53,10 +53,6 @@ export default function PlayerLoginPage() {
 
   useEffect(() => {
     pruneExpiredAuth();
-
-    // Pre-fill last used URL immediately (synchronous — no flicker)
-    const stored = loadPlayerAuth();
-    if (stored) { setSavedAuth(stored); setProfileUrl(stored.url); }
 
     // Check for an active server session — redirect if still logged in
     (async () => {
@@ -82,7 +78,7 @@ export default function PlayerLoginPage() {
       return;
     }
     setLoading(true); setLoadingStep(0);
-    const steps = STEPS(lang);
+    const steps = STEPS();
     setLoadingMsg(steps[0]);
     const stepTick = setInterval(() => {
       setLoadingStep(s => {
@@ -96,7 +92,12 @@ export default function PlayerLoginPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'player', profile_url: url }),
       });
-      if (!loginRes.ok) throw new Error(t('common.error'));
+
+      if (!loginRes.ok) {
+        const errData = await loginRes.json().catch(() => ({}));
+        throw new Error((errData as { error?: string }).error || t('common.error'));
+      }
+
       const loginData = await loginRes.json();
       savePlayerAuth(url, loginData.name);
       router.push('/dashboard');
@@ -114,7 +115,7 @@ export default function PlayerLoginPage() {
     );
   }
 
-  const steps = STEPS(lang);
+  const steps = STEPS();
 
   return (
     <div className="min-h-dvh flex flex-col" style={{ position:'relative', zIndex:1 }}>
