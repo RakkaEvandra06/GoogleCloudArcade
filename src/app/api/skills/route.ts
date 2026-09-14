@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getSkillBadges } from '@/lib/db';
+import { checkRateLimit, getClientIP } from '@/lib/security';
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: Request) {
+  const ip = getClientIP(req);
+
+  if (!checkRateLimit(`skills:${ip}`, 60, 60)) {
+    return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 });
+  }
+
   try {
     const skills = await getSkillBadges();
     return NextResponse.json({ skills });
