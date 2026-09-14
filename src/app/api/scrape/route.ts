@@ -6,6 +6,7 @@ import {
   getClientIP,
   logSecurity,
   sanitizeString,
+  sanitizeImageUrl,
 } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
@@ -32,15 +33,15 @@ export async function GET(request: Request) {
 
   if (!rawUrl) return NextResponse.json({ error: 'URL profil wajib diisi.' }, { status: 400 });
 
-  // ── SSRF protection: validate before any fetch ─────────────────────────────
+// ── SSRF protection: validate before any fetch ─────────────────────────────
   const validation = validateScrapeUrl(rawUrl);
   if (!validation.ok) {
     logSecurity('warn', 'invalid_url', { reason: validation.error });
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  // Normalise any variant → canonical https://www.skills.google/public_profiles/…
-  let targetUrl = rawUrl
+// Normalise any variant → canonical https://www.skills.google/public_profiles/…
+  const targetUrl = rawUrl
     .replace(
       /^https?:\/\/(www\.)?cloudskillsboost\.google\.com\/public_profiles\//,
       'https://www.skills.google/public_profiles/',
@@ -51,14 +52,6 @@ export async function GET(request: Request) {
     );
 
   try {
-    // ── Manual redirect following ──────────────────────────────────────────
-    // The previous implementation used `redirect: 'follow'`, which follows
-    // up to 20 redirects without re-validating the destination. A crafted
-    // profile URL could redirect through an intermediate hop that bypasses
-    // the allowlist in validateScrapeUrl — a SSRF escalation path.
-    //
-    // Fix: follow manually, re-run validateScrapeUrl on every Location header
-    // before following it, and abort if the chain exceeds MAX_REDIRECTS.
     let currentUrl    = targetUrl;
     let finalResponse: Response | null = null;
 
@@ -79,19 +72,24 @@ export async function GET(request: Request) {
         const location = resp.headers.get('location');
         if (!location) { finalResponse = resp; break; }
 
-        // Resolve relative URLs (e.g. /login?return=…)
+// Resolve relative URLs (e.g. /login?return=…)
         let nextUrl: string;
         try { nextUrl = new URL(location, currentUrl).href; }
         catch { return NextResponse.json({ error: 'Invalid redirect URL.' }, { status: 400 }); }
 
-        // Re-validate the redirect destination before following it
+// Re-validate the redirect destination before following it
         const recheck = validateScrapeUrl(nextUrl);
         if (!recheck.ok) {
-          logSecurity('warn', 'ssrf_attempt', { reason: 'redirect_to_disallowed_host', from: currentUrl, to: nextUrl, detail: recheck.error });
+          logSecurity('warn', 'ssrf_attempt', {
+            reason: 'redirect_to_disallowed_host',
+            from:   currentUrl,
+            to:     nextUrl,
+            detail: recheck.error,
+          });
           return NextResponse.json({ error: 'Redirect destination not permitted.' }, { status: 400 });
         }
 
-        // Detect private/missing profile redirect
+ // Detect private/missing profile redirect
         if (SKILLS_HOME.has(nextUrl) || SKILLS_HOME.has(nextUrl.replace(/\/$/, '') + '/')) {
           return NextResponse.json({
             error: 'Profil tidak ditemukan atau disetel ke Privat. Silakan ubah pengaturan profil Anda menjadi Publik.',
@@ -116,21 +114,21 @@ export async function GET(request: Request) {
     const html = await finalResponse.text();
     const $    = cheerio.load(html);
 
-    // ── Extract name ───────────────────────────────────────────────────────
-    let name = $('h1').first().text().trim()
+// ── Extract name ───────────────────────────────────────────────────────
+    const name = $('h1').first().text().trim()
       || $('.ql-display-1').first().text().trim()
       || 'Google Cloud Learner';
 
-    // ── Extract avatar ─────────────────────────────────────────────────────
-    let avatarUrl =
+// ── Extract avatar ─────────────────────────────────────────────────────
+    const rawAvatarUrl =
       $('ql-avatar.profile-avatar').attr('src') ||
-      $('.profile-avatar').attr('src') ||
+      $('.profile-avatar').attr('src')           ||
       $('.profile-avatar img, .avatar img').first().attr('src') ||
       '';
-    if (avatarUrl.startsWith('//')) avatarUrl = 'https:' + avatarUrl;
-    if (avatarUrl && !avatarUrl.startsWith('http')) avatarUrl = '';
 
-    // ── Extract badges ─────────────────────────────────────────────────────
+    const avatarUrl = sanitizeImageUrl(rawAvatarUrl);
+
+// ── Extract badges ─────────────────────────────────────────────────────
     type Badge = {
       badge_name:  string;
       category:    'game' | 'skill_badge';
@@ -143,7 +141,9 @@ export async function GET(request: Request) {
     $('.profile-badge').each((_, el) => {
       const title    = $(el).find('.ql-title-medium, .ql-subheading-1').text().trim();
       const dateText = $(el).find('.ql-body-medium, .ql-body-large, .ql-label-medium').text().trim();
-      const imageUrl = $(el).find('img').attr('src') || '';
+      const rawImageUrl = $(el).find('img').attr('src') || '';
+      const imageUrl    = sanitizeImageUrl(rawImageUrl);
+
       if (!title) return;
 
       const cleanDate  = dateText.replace(/Earned\s+(on\s+)?/i, '').trim();
@@ -180,7 +180,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error: unknown) {
-    // Log server-side only — raw error strings must never reach the client
+// Log server-side only — raw error strings must never reach the client
     console.error('[scrape] fetch error:', error instanceof Error ? error.message : 'unknown');
     return NextResponse.json(
       { error: 'Gagal mengambil data dari Google Skills Boost. Silakan coba beberapa saat lagi.' },
