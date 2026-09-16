@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ExitIcon } from '@radix-ui/react-icons';
 import { useLang } from '@/lib/LanguageContext';
+import { useTheme } from '@/lib/useTheme';
 
 interface SignOutDialogProps {
   isOpen: boolean;
@@ -13,25 +14,8 @@ interface SignOutDialogProps {
 
 export default function SignOutDialog({ isOpen, onConfirm, onCancel, userName }: SignOutDialogProps) {
   const { t } = useLang();
-
-  const [isDark, setIsDark] = useState(true); // safe SSR default; corrected on first client effect
-
-  useEffect(() => {
-    const sync = () =>
-      setIsDark(document.documentElement.getAttribute('data-theme') !== 'light');
-
-    // Correct value immediately on mount (before any user interaction)
-    sync();
-
-    // Stay in sync for all subsequent theme changes
-    const observer = new MutationObserver(sync);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme'],
-    });
-
-    return () => observer.disconnect();
-  }, []);
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   useEffect(() => {
     if (!isOpen) return;
@@ -68,8 +52,6 @@ export default function SignOutDialog({ isOpen, onConfirm, onCancel, userName }:
           <div
             className="relative w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5 animate-scale-in"
             style={{
-              /* Light: pure white card matching reference image.
-                 Dark:  near-opaque deep-navy panel. */
               background: isDark ? 'rgba(13,19,25,0.98)' : '#ffffff',
               border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)'}`,
               boxShadow: isDark
@@ -111,8 +93,6 @@ export default function SignOutDialog({ isOpen, onConfirm, onCancel, userName }:
                 onClick={onCancel}
                 className="py-2.5 rounded-xl text-sm font-semibold transition-all"
                 style={{
-                  /* Light: soft neutral pill matching reference Cancel button.
-                     Dark:  subtle white-tinted glass button. */
                   background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
                   border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'}`,
                   color: 'var(--text-muted)',
