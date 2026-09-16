@@ -36,9 +36,12 @@ export async function POST(req: Request) {
       .replace(/^https?:\/\/skills\.google\/public_profiles\//, 'https://www.skills.google/public_profiles/');
 
     try {
+      // ── Look up or create the participant ────────────────────────────────
       let p = await getParticipantByUrl(url);
       if (!p) {
         p = await addParticipant({ name: '', profile_url: url, role: 'participant' });
+
+        // ── Scrape + badge enrichment (non-fatal) ────────────────────────────
         try {
           const base = new URL(req.url).origin;
           const s = await fetch(
