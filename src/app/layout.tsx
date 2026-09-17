@@ -15,11 +15,23 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-scroll-behavior="smooth">
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+  try {
+    var t = localStorage.getItem('arcade-theme') || 'dark';
+    var html = document.documentElement;
+    html.setAttribute('data-theme', t);
+    html.classList.add(t);
+    html.classList.remove(t === 'dark' ? 'light' : 'dark');
+  } catch(e) {}
+})();`,
+          }}
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Geist Sans + Geist Mono via Google Fonts (available as open-source fonts) */}
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap"
           rel="stylesheet"
