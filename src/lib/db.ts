@@ -17,8 +17,8 @@ function getClient(): SupabaseClient {
   return _supabase;
 }
 
-// Active arcade period — badges outside this range are pruned to save free-tier row counts.
 export const ACTIVE_PERIOD_START = '2026-07-01';
+export const MAX_PARTICIPANTS_PER_QUERY = 2_000;
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 export interface Participant {
@@ -80,13 +80,28 @@ export async function getSkillBadges(): Promise<SkillBadge[]> {
   return data ?? [];
 }
 
-export async function getParticipants(): Promise<Participant[]> {
+export async function getParticipants(
+  limit  = MAX_PARTICIPANTS_PER_QUERY,
+  offset = 0,
+): Promise<Participant[]> {
+  const safeLimit  = Math.min(Math.max(1, limit),  MAX_PARTICIPANTS_PER_QUERY);
+  const safeOffset = Math.max(0, offset);
+
   const { data, error } = await getClient()
     .from('participants')
     .select('*')
-    .order('monthly_points', { ascending: false });
+    .order('monthly_points', { ascending: false })
+    .range(safeOffset, safeOffset + safeLimit - 1);   // server-side pagination
   if (error) throw error;
   return data ?? [];
+}
+
+export async function getParticipantCount(): Promise<number> {
+  const { count, error } = await getClient()
+    .from('participants')
+    .select('*', { count: 'exact', head: true });
+  if (error) throw error;
+  return count ?? 0;
 }
 
 export async function getParticipant(id: string): Promise<Participant | null> {
@@ -97,7 +112,12 @@ export async function getParticipant(id: string): Promise<Participant | null> {
 
 export async function getParticipantByUrl(profileUrl: string): Promise<Participant | null> {
   const { data, error } = await getClient()
-    .from('participants').select('*').ilike('profile_url', profileUrl).maybeSingle();
+    .from('participants')
+    .select('*')
+    .ilike('profile_url', profileUrl)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
   if (error) throw error;
   return data;
 }
