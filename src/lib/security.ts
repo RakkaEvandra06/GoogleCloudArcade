@@ -131,6 +131,8 @@ export function validateScrapeUrl(rawUrl: string): ValidationResult {
   return { ok: true };
 }
 
+// ─── IMAGE URL SANITISATION ────────────────────────────────────────────────
+
 export function sanitizeImageUrl(rawUrl: string): string {
   if (!rawUrl) return '';
   const url = rawUrl.startsWith('//') ? 'https:' + rawUrl : rawUrl;
@@ -185,7 +187,7 @@ export function escapeHtml(s: string): string {
           .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// ─── IN-PROCESS RATE LIMITING ─────────────────────────────────────────────────
+// ─── IN-PROCESS RATE LIMITING (best-effort) ───────────────────────────────────
 
 interface RateEntry { count: number; resetAt: number }
 const _rateMap = new Map<string, RateEntry>();
