@@ -628,3 +628,60 @@ body::before {
 [data-theme="light"] .shadow-\[4px_4px_0px_\#000\] { box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important; }
 [data-theme="light"] .shadow-\[3px_3px_0px_\#000\] { box-shadow: 0 2px 6px rgba(0,0,0,0.10) !important; }
 [data-theme="light"] .shadow-\[2px_2px_0px_\#000\] { box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; }
+
+/* ═══════════════════════════════════════════════════════════
+   SMOOTH THEME TRANSITION
+   Applied to <html> so every CSS-variable-driven colour fades
+   when the user toggles dark ↔ light. Excluded from properties
+   that would interfere with layout or animations.
+   ═══════════════════════════════════════════════════════════ */
+html {
+  transition:
+    background-color 220ms ease,
+    color            220ms ease;
+}
+
+/* Let the body pick up the same fade */
+body {
+  transition:
+    background-color 220ms ease,
+    color            220ms ease;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHT MODE — LOGIN PAGES
+   The three login pages (admin, player, facilitator) render a
+   full-bleed card on their own page. Without these overrides
+   the hero background stays #04080f in light mode.
+   ═══════════════════════════════════════════════════════════ */
+[data-theme="light"] .login-page-bg {
+  background: linear-gradient(135deg, #e8f0fe 0%, #f0f4ff 50%, #e8f5e9 100%);
+}
+
+[data-theme="light"] .login-card {
+  background: #ffffff;
+  border-color: var(--border-md);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* Ensure ThemeLangToggle switch knob is visible in light mode */
+[data-theme="light"] .theme-switch-knob {
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+
+/* ── Tag overrides for light mode ── */
+[data-theme="light"] .tag-blue   { background: rgba(66,133,244,0.10); color: var(--blue);   border-color: var(--blue-border);   }
+[data-theme="light"] .tag-green  { background: rgba(52,168,83,0.10);  color: var(--green);  border-color: var(--green-border);  }
+[data-theme="light"] .tag-red    { background: rgba(234,67,53,0.10);  color: var(--red);    border-color: var(--red-border);    }
+[data-theme="light"] .tag-yellow { background: rgba(249,171,0,0.10);  color: var(--yellow); border-color: var(--yellow-border); }
+
+/* Ensure btn-cyan is visible in light mode */
+[data-theme="light"] .btn-cyan {
+  background: rgba(66,133,244,0.12);
+  color: var(--blue);
+  border-color: var(--blue-border);
+}
+[data-theme="light"] .btn-cyan:hover {
+  background: rgba(66,133,244,0.20);
+}
