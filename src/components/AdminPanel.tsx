@@ -62,7 +62,7 @@ export default function AdminPanel() {
     <div className="min-h-dvh" style={{position:'relative',zIndex:1}}>
       {/* SignOutDialog — was imported and stateful but never rendered before this fix */}
       <SignOutDialog isOpen={showSignOut} onCancel={()=>setShowSignOut(false)} onConfirm={async()=>{setShowSignOut(false);await signOut();}} />
-      <div className="w-full" style={{background: isDark ? 'rgba(13,19,25,0.92)' : 'rgba(250,251,253,0.94)', backdropFilter:'blur(16px)',borderBottom:'1px solid var(--border-md)'}}>
+      <div className="w-full" style={{position:'relative', zIndex:20, background: isDark ? 'rgba(13,19,25,0.92)' : 'rgba(250,251,253,0.94)', backdropFilter:'blur(16px)',borderBottom:'1px solid var(--border-md)'}}>
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3"><img src="/500px.png" alt="" className="w-8 h-8 rounded-lg object-cover" style={{border:'1px solid rgba(234,67,53,0.5)'}}/><div><span className="font-bold text-sm" style={{color:'var(--foreground)'}}>{t('admin.panel_title')}</span><span className="font-mono text-xs ml-2" style={{color:'var(--red)'}}>{t('admin.mentor_title')}</span></div></div>
           <div className="flex items-center gap-2">

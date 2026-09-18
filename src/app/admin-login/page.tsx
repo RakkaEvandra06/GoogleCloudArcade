@@ -9,15 +9,28 @@ import { ShieldLockIcon, LockIcon, CheckCircleIcon, XIcon } from '@/components/I
 export default function AdminLoginPage() {
   const router = useRouter();
   const { t } = useLang();
-  const [secret,    setSecret]    = useState('');
-  const [loading,   setLoad]      = useState(false);
-  const [err,       setErr]       = useState('');
-  const [savedAuth, setSavedAuth] = useState<{ secret: string; savedAt: number } | null>(null);
+  // Lazy init from localStorage (avoids setState inside effect)
+  const initAuth = typeof window !== 'undefined' ? loadAdminAuth() : null;
+  const [secret,         setSecret]         = useState(initAuth?.secret ?? '');
+  const [loading,        setLoad]           = useState(false);
+  const [err,            setErr]            = useState('');
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [savedAuth, setSavedAuth] = useState<{ secret: string; savedAt: number } | null>(initAuth);
 
   useEffect(() => {
     pruneExpiredAuth();
-    const a = loadAdminAuth();
-    if (a) { setSavedAuth(a); setSecret(a.secret); }
+    (async () => {
+      try {
+        const meRes = await fetch('/api/auth/me');
+        if (!meRes.ok) { setSessionChecked(true); return; }
+        const { session } = await meRes.json();
+        if (session?.role === 'admin') {
+          router.push('/admin'); return;
+        }
+      } catch { /* Show login form on any error */ }
+      setSessionChecked(true);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,13 +38,30 @@ export default function AdminLoginPage() {
     if (!secret.trim()) return;
     setErr(''); setLoad(true);
     try {
-      const res  = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'admin', secret }) });
+      const res  = await fetch('/api/auth/login', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ type: 'admin', secret }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t('common.error'));
       saveAdminAuth(secret.trim());
       router.push('/admin');
-    } catch (e: unknown) { setErr(e instanceof Error ? e.message : t('common.error')); setLoad(false); }
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : t('common.error'));
+      setLoad(false);
+    }
   };
+
+  // Show spinner while checking for an existing session
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center" style={{ position: 'relative', zIndex: 1 }}>
+        <span className="w-5 h-5 border-2 rounded-full animate-spin"
+          style={{ borderColor: 'var(--border-md)', borderTopColor: 'var(--red)' }} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
