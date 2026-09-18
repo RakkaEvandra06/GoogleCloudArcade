@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Participant, UploadBatch } from '@/lib/db';
 import { useLang } from '@/lib/LanguageContext';
+import { useTheme } from '@/lib/useTheme';
 import SignOutDialog from '@/components/SignOutDialog';
 import ThemeLangToggle from '@/components/ThemeLangToggle';
 import { saveFacAuth, loadFacAuth, clearFacAuth, pruneExpiredAuth } from '@/lib/localAuth';
@@ -45,15 +46,8 @@ export default function FacilitatorDashboard({ facName }: { facName: string }) {
   const [showSignOut,   setShowSignOut]   = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { t } = useLang();
-
-  const [isDark, setIsDark] = useState(true);
-  useEffect(() => {
-    const sync = () => setIsDark(document.documentElement.getAttribute('data-theme') !== 'light');
-    sync();
-    const obs = new MutationObserver(sync);
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => obs.disconnect();
-  }, []);
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   const toast = (m: string) => { setNote(m); setTimeout(() => setNote(null), 3500); };
 
