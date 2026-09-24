@@ -1,12 +1,23 @@
 {
   "crons": [
     {
-      "path": "/api/cron/sync-participants",
+      "path":     "/api/cron/sync-participants",
       "schedule": "0 16 * * *"
     },
     {
-      "path": "/api/cron/refresh-leaderboard",
+      "path":     "/api/cron/refresh-leaderboard",
       "schedule": "30 16 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "src/app/api/cron/sync-participants/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/cron/refresh-leaderboard/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/admin/master-sync/route.ts": {
+      "maxDuration": 300
+    }
+  }
 }
