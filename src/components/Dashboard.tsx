@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { achievedMilestone, MILESTONES as CANONICAL_MILESTONES } from '@/lib/milestones';
 import { Participant, Badge, SkillBadge } from '@/lib/db';
 import { ExternalLinkIcon as RadixExternal } from '@radix-ui/react-icons';
 import {
   TierIcon, PlayIcon, StarIcon, TrendUpIcon, TrophyIcon,
   CheckIcon, ArrowUpRightIcon, RefreshIcon, ExternalLinkIcon,
   GridIcon, LayersIcon, BadgeIcon, ClockIcon, InfoIcon,
-  AlertIcon, SearchIcon,
+  AlertIcon, SearchIcon, MessageIcon, SendIcon, CheckCircleIcon,
   type IconProps,
 } from '@/components/Icons';
 
@@ -27,14 +28,19 @@ const TIERS = [
   { key: 'tier.trooper',  min: 50,  color: '#34a853', bg: 'rgba(52,168,83,0.10)',   border: 'rgba(52,168,83,0.28)'   },
 ];
 
-const MILESTONES = [
-  { id: 1, label: 'Milestone 1', games: 6,  badge: 14,  bonus: 7,  color: '#4ade80', bg: 'rgba(74,222,128,0.2)', border:'rgba(34,211,238,0.22)' },
-  { id: 2, label: 'Milestone 2', games: 8,  badge: 28, bonus: 18, color: '#4ade80', bg: 'rgba(34,211,238,0.2)', border:'rgba(34,211,238,0.22)' },
-  { id: 3, label: 'Milestone 3', games: 3,  badge: 42, bonus: 29, color: '#4ade80', bg: 'rgba(34,211,238,0.2)', border:'rgba(34,211,238,0.22)' },
-  { id: 4, label: 'Ultimate Milestone', games: 12,  badge: 56, bonus: 40, color: '#4ade80', bg: 'rgba(251,191,36,0.2)', border:'rgba(251,191,36,0.22)' },
-];
+const MILESTONE_VISUALS = [
+  { color: '#4ade80', bg: 'rgba(74,222,128,0.2)',  border: 'rgba(34,211,238,0.22)' }, // M1
+  { color: '#4ade80', bg: 'rgba(34,211,238,0.2)',  border: 'rgba(34,211,238,0.22)' }, // M2
+  { color: '#4ade80', bg: 'rgba(34,211,238,0.2)',  border: 'rgba(34,211,238,0.22)' }, // M3
+  { color: '#4ade80', bg: 'rgba(251,191,36,0.2)',  border: 'rgba(251,191,36,0.22)' }, // M4 (Ultimate)
+] as const;
 
-/* ─── JULY 2026 GAME TRACKS (corrected from skills.google) ─ */
+const MILESTONES = CANONICAL_MILESTONES.map((m, i) => ({
+  ...m,
+  ...MILESTONE_VISUALS[i],
+}));
+
+/* ─── ACTIVE ARCADE GAME TRACKS ─── */
 const JULY_TRACKS = [
   {
     id: 1, name: 'Arcade Base Camp', type: 'Base Camp', level: 'Beginner',
@@ -229,7 +235,7 @@ function trackDone(track: typeof JULY_TRACKS[0], games: Badge[]) {
 
 /* ─── MAIN COMPONENT ────────────────────────────────────── */
 interface Props { participant: Participant; badges: Badge[]; }
-type SubTab = 'overview' | 'catalog' | 'badges';
+type SubTab = 'overview' | 'catalog' | 'badges' | 'feedback';
 
 export default function Dashboard({ participant, badges }: Props) {
   const { t } = useLang();
@@ -246,10 +252,12 @@ export default function Dashboard({ participant, badges }: Props) {
   const games    = monthly.filter(b => b.category === 'game');
   const skills   = monthly.filter(b => b.category === 'skill_badge');
   const arcPts   = games.length + skills.length * 0.5;
-  const m1Done   = games.length >= 1 && skills.length >= 7;
-  const m2Done   = games.length >= 3 && skills.length >= 14;
-  const m3Done   = games.length >= 8 && skills.length >= 28;
-  const facBonus = m3Done ? 25 : m2Done ? 15 : m1Done ? 5 : 0;
+  const achieved = achievedMilestone(games.length, skills.length);
+  const m1Done   = (achieved?.id ?? 0) >= 1;
+  const m2Done   = (achieved?.id ?? 0) >= 2;
+  const m3Done   = (achieved?.id ?? 0) >= 3;
+  const m4Done   = (achieved?.id ?? 0) >= 4;
+  const facBonus = achieved?.bonus ?? 0;
   const total    = arcPts + facBonus;
   const currentTier = TIERS.find(t => total >= t.min) ?? null;
   const nextTier    = TIERS[currentTier ? TIERS.indexOf(currentTier) - 1 : TIERS.length - 1];
@@ -264,9 +272,6 @@ export default function Dashboard({ participant, badges }: Props) {
   const catalogSource = (dbSkills.length > 0 ? dbSkills.map(s => ({ ...s, cat: 'general' })) : CATALOG_BADGES) as (SkillBadge & { cat: string })[];
   const earnedSkills  = badges.filter(b => b.category === 'skill_badge');
 
-  /* Base filter — search + diff + cat, WITHOUT status.
-     Used for button counts so they reflect the search context,
-     not the currently active status tab. */
   const baseFiltered = catalogSource.filter(s => {
     const ms = !search || s.name.toLowerCase().includes(search.toLowerCase());
     const md = diff === 'all' || (s.difficulty?.toLowerCase() ?? '') === diff.toLowerCase();
@@ -290,7 +295,7 @@ export default function Dashboard({ participant, badges }: Props) {
     <div className="space-y-3 animate-fade-slide-up" style={{ position:'relative', zIndex:1 }}>
       {/* Sub-tab bar */}
       <div className="flex gap-1 p-1 rounded-xl" style={{ background:'var(--surface)', border:'1px solid var(--border-md)' }}>
-        {([['overview', t('dash.tab.overview'), GridIcon],['catalog', t('dash.tab.fasttrack'), LayersIcon],['badges', t('dash.tab.mybadges'), BadgeIcon]] as [SubTab, string, ArcadeIcon][]).map(([id, label, TabIcon]) => {
+        {([['overview', t('dash.tab.overview'), GridIcon],['catalog', t('dash.tab.fasttrack'), LayersIcon],['badges', t('dash.tab.mybadges'), BadgeIcon],['feedback', t('dash.tab.feedback'), MessageIcon]] as [SubTab, string, ArcadeIcon][]).map(([id, label, TabIcon]) => {
           const active = activeTab === id;
           return (
             <button key={id} onClick={() => { setActiveTab(id); setPage(1); }}
@@ -304,18 +309,19 @@ export default function Dashboard({ participant, badges }: Props) {
         })}
       </div>
 
-      {activeTab === 'overview' && <OverviewTab games={games} skills={skills} arcPts={arcPts} facBonus={facBonus} total={total} currentTier={currentTier} nextTier={nextTier} m1Done={m1Done} m2Done={m2Done} m3Done={m3Done} monthly={monthly} allBadges={badges} />}
+      {activeTab === 'overview' && <OverviewTab games={games} skills={skills} arcPts={arcPts} facBonus={facBonus} total={total} currentTier={currentTier} nextTier={nextTier} m1Done={m1Done} m2Done={m2Done} m3Done={m3Done} m4Done={m4Done} monthly={monthly} allBadges={badges} />}
       {activeTab === 'catalog'  && <CatalogTab paged={paged} filtered={filtered} baseTotal={baseFiltered.length} baseDoneCount={baseDoneCount} basePendingCount={basePendingCount} search={search} setSearch={s=>{setSearch(s);setPage(1);}} diff={diff} setDiff={d=>{setDiff(d);setPage(1);}} cat={cat} setCat={c=>{setCat(c);setPage(1);}} status={status} setStatus={st=>{setStatus(st);setPage(1);}} page={page} setPage={setPage} totalPages={totalPages} monthly={monthly} earnedSkills={earnedSkills} />}
       {activeTab === 'badges'   && <BadgesTab badges={badges} monthly={monthly} />}
+      {activeTab === 'feedback'  && <FeedbackTab />}
     </div>
   );
 }
 
 /* ─── OVERVIEW TAB ────────────────────────────────────────── */
-function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, nextTier, m1Done, m2Done, m3Done, monthly, allBadges }: {
+function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, nextTier, m1Done, m2Done, m3Done, m4Done, monthly, allBadges }: {
   games:Badge[]; skills:Badge[]; arcPts:number; facBonus:number; total:number;
   currentTier:typeof TIERS[0]|null; nextTier:typeof TIERS[0]|undefined;
-  m1Done:boolean; m2Done:boolean; m3Done:boolean; monthly:Badge[]; allBadges:Badge[];
+  m1Done:boolean; m2Done:boolean; m3Done:boolean; m4Done:boolean; monthly:Badge[]; allBadges:Badge[];
 }) {
   const [selectedTrack, setSelectedTrack] = useState<TrackInfo | null>(null);
   const { t } = useLang();
@@ -410,10 +416,10 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
           {/* Milestones: inner 2-col grid, takes 2 of 3 outer columns */}
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
             {MILESTONES.map((m, i) => {
-              const done  = i===0 ? m1Done : i===1 ? m2Done : i===2 ? m3Done : m3Done;
+              const done  = i===0 ? m1Done : i===1 ? m2Done : i===2 ? m3Done : m4Done;
               const gDone = Math.min(games.length, m.games);
-              const sDone = Math.min(skills.length, m.badge);
-              const pct   = Math.round(((gDone + sDone) / (m.games + m.badge)) * 100);
+              const sDone = Math.min(skills.length, m.skills);
+              const pct   = Math.round(((gDone + sDone) / (m.games + m.skills)) * 100);
               return (
                 <div key={m.id}
                   className={`animate-fade-slide-up stagger-${i+2} rounded-xl p-4 relative overflow-hidden`}
@@ -434,7 +440,7 @@ function OverviewTab({ games, skills, arcPts, facBonus, total, currentTier, next
                   </p>
                   <div className="space-y-2 mb-3">
                     <ProgressRow label={t("dash.label.game")}  done={gDone} total={m.games} color={m.color} />
-                    <ProgressRow label={t("dash.label.skill")} done={sDone} total={m.badge} color={m.color} />
+                    <ProgressRow label={t("dash.label.skill")} done={sDone} total={m.skills} color={m.color} />
                   </div>
                   <p className="text-[10px] font-mono"
                     style={{ color: done ? m.color : 'var(--text-dim)' }}>
@@ -852,6 +858,183 @@ function BadgesTab({ badges, monthly }: { badges:Badge[]; monthly:Badge[] }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── FEEDBACK TAB ──────────────────────────────────────── */
+function FeedbackTab() {
+  const { t } = useLang();
+
+  const CATEGORIES = [
+    { id: 'general',    label: () => t('feedback.cat.general')    },
+    { id: 'suggestion', label: () => t('feedback.cat.suggestion') },
+    { id: 'bug',        label: () => t('feedback.cat.bug')        },
+    { id: 'praise',     label: () => t('feedback.cat.praise')     },
+  ] as const;
+
+  const [message,  setMessage]  = useState('');
+  const [category, setCategory] = useState<'general'|'suggestion'|'bug'|'praise'>('general');
+  const [rating,   setRating]   = useState<number|null>(null);
+  const [hover,    setHover]    = useState<number|null>(null);
+  const [status,   setStatus]   = useState<'idle'|'sending'|'success'|'error'|'short'|'limit'>('idle');
+
+  const charsLeft    = message.length;
+  const canSubmit    = message.trim().length >= 5 && status !== 'sending' && status !== 'success';
+  const activeRating = hover ?? rating;
+
+  async function handleSubmit() {
+    if (message.trim().length < 5) { setStatus('short'); return; }
+    setStatus('sending');
+    try {
+      const res = await fetch('/api/feedback', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ message: message.trim(), category, rating }),
+      });
+      if (res.status === 429) { setStatus('limit'); return; }
+      if (!res.ok)            { setStatus('error'); return; }
+      setStatus('success');
+      setMessage('');
+      setRating(null);
+      setCategory('general');
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  return (
+    <div className="glass-card animate-fade-slide-up space-y-5">
+
+      {/* Header */}
+      <div className="flex items-start gap-3">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background:'var(--blue)18', border:'1px solid var(--blue)30' }}>
+          <MessageIcon size={15} style={{ color:'var(--blue)' }} aria-hidden="true" />
+        </div>
+        <div>
+          <p className="font-bold text-sm" style={{ color:'var(--foreground)' }}>{t('feedback.title')}</p>
+          <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color:'var(--text-muted)' }}>{t('feedback.subtitle')}</p>
+        </div>
+      </div>
+
+      {/* Success state */}
+      {status === 'success' && (
+        <div className="flex items-center gap-3 p-4 rounded-xl"
+          style={{ background:'rgba(52,168,83,0.08)', border:'1px solid rgba(52,168,83,0.30)' }}>
+          <CheckCircleIcon size={18} style={{ color:'var(--green)', flexShrink:0 }} aria-hidden="true" />
+          <p className="text-sm font-medium" style={{ color:'var(--green)' }}>{t('feedback.success')}</p>
+        </div>
+      )}
+
+      {/* Form — hidden after success so the clean state is the call-to-action */}
+      {status !== 'success' && (<>
+
+        {/* Category */}
+        <div className="space-y-2">
+          <p className="text-[10px] font-mono font-bold uppercase tracking-widest"
+            style={{ color:'var(--text-muted)' }}>{t('feedback.category')}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {CATEGORIES.map(({ id, label }) => {
+              const active = category === id;
+              const colors: Record<string, string> = {
+                general: 'var(--blue)', suggestion: 'var(--purple)',
+                bug: 'var(--red)', praise: 'var(--green)',
+              };
+              const c = colors[id];
+              return (
+                <button key={id} onClick={() => setCategory(id)}
+                  className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+                  style={active
+                    ? { background:`${c}20`, color:c, border:`1px solid ${c}60` }
+                    : { background:'var(--surface-alt)', color:'var(--text-muted)', border:'1px solid var(--border)' }
+                  }>
+                  {label()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Star rating */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-mono font-bold uppercase tracking-widest"
+              style={{ color:'var(--text-muted)' }}>{t('feedback.rating')}</p>
+            {rating !== null && (
+              <button onClick={() => setRating(null)}
+                className="text-[10px] font-mono transition-opacity hover:opacity-70"
+                style={{ color:'var(--text-muted)' }}>
+                {t('feedback.rating.skip')}
+              </button>
+            )}
+          </div>
+          <div className="flex gap-1.5" onMouseLeave={() => setHover(null)}>
+            {[1,2,3,4,5].map(n => (
+              <button key={n}
+                onMouseEnter={() => setHover(n)}
+                onClick={() => setRating(r => r === n ? null : n)}
+                aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                className="p-1 rounded-lg transition-all"
+                style={{ background: activeRating !== null && n <= activeRating
+                  ? 'rgba(251,188,5,0.15)' : 'var(--surface-alt)',
+                  border: activeRating !== null && n <= activeRating
+                  ? '1px solid rgba(251,188,5,0.40)' : '1px solid var(--border)' }}>
+                <StarIcon size={20}
+                  style={{ color: activeRating !== null && n <= activeRating
+                    ? '#FBBC05' : 'var(--border-md)',
+                    fill: activeRating !== null && n <= activeRating ? '#FBBC05' : 'none',
+                    transition:'color 0.15s, fill 0.15s' }} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Message textarea */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-mono font-bold uppercase tracking-widest"
+              style={{ color:'var(--text-muted)' }}>{t('feedback.message')}</p>
+            <span className="text-[10px] font-mono"
+              style={{ color: charsLeft > 1800 ? 'var(--red)' : 'var(--text-muted)' }}>
+              {t('feedback.chars').replace('{n}', String(charsLeft))}
+            </span>
+          </div>
+          <textarea
+            value={message}
+            onChange={e => { setMessage(e.target.value.slice(0, 2000)); if (status !== 'idle') setStatus('idle'); }}
+            placeholder={t('feedback.placeholder')}
+            rows={5}
+            className="glass-input w-full resize-none text-xs leading-relaxed"
+            style={{ fontFamily:'inherit', padding:'12px 14px' }}
+            aria-label={t('feedback.message')}
+          />
+          {/* Inline validation/error messages */}
+          {status === 'short' && (
+            <p className="text-[11px] font-mono" style={{ color:'var(--red)' }}>
+              {t('feedback.error.short')}
+            </p>
+          )}
+          {(status === 'error' || status === 'limit') && (
+            <p className="text-[11px] font-mono" style={{ color:'var(--red)' }}>
+              {status === 'limit' ? t('feedback.error.limit') : t('feedback.error')}
+            </p>
+          )}
+        </div>
+
+        {/* Submit */}
+        <button onClick={handleSubmit} disabled={!canSubmit}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+          style={canSubmit
+            ? { background:'var(--blue)', color:'#fff', boxShadow:'0 2px 8px rgba(66,133,244,0.30)' }
+            : { background:'var(--surface-alt)', color:'var(--text-muted)', cursor:'not-allowed' }}>
+          {status === 'sending'
+            ? <><RefreshIcon size={14} className="animate-spin" aria-hidden="true" />{t('feedback.submitting')}</>
+            : <><SendIcon    size={14} aria-hidden="true" />{t('feedback.submit')}</>
+          }
+        </button>
+
+      </>)}
     </div>
   );
 }
