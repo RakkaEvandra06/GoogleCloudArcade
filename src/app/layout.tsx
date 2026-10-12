@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import './globals.css';
 import Providers from '@/components/Providers';
 
@@ -13,11 +14,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Middleware sets x-nonce on every request; fall back to '' (empty) so the
+  // attribute is rendered but the script is blocked if the nonce is somehow
+  // absent — this is the safe failure mode.
+  const nonce = (await headers()).get('x-nonce') ?? '';
+
   return (
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <script
+          nonce={nonce}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `(function(){
   try {
