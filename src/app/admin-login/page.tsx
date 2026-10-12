@@ -3,65 +3,57 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { useLang } from '@/lib/LanguageContext';
-import { loadAdminAuth, saveAdminAuth, clearAdminAuth, pruneExpiredAuth, authExpiresIn } from '@/lib/localAuth';
-import { ShieldLockIcon, LockIcon, CheckCircleIcon, XIcon } from '@/components/Icons';
+import { pruneExpiredAuth } from '@/lib/localAuth';
+import { ShieldLockIcon, LockIcon } from '@/components/Icons';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const { t } = useLang();
-  // Lazy init from localStorage (avoids setState inside effect)
-  const initAuth = typeof window !== 'undefined' ? loadAdminAuth() : null;
-  const [secret,         setSecret]         = useState(initAuth?.secret ?? '');
-  const [loading,        setLoad]           = useState(false);
-  const [err,            setErr]            = useState('');
-  const [sessionChecked, setSessionChecked] = useState(false);
-  const [savedAuth, setSavedAuth] = useState<{ secret: string; savedAt: number } | null>(initAuth);
+  const { t }  = useLang();
+
+  const [secret,  setSecret]  = useState('');
+  const [loading, setLoading] = useState(false);
+  const [err,     setErr]     = useState('');
 
   useEffect(() => {
-    pruneExpiredAuth();
+    pruneExpiredAuth(); // clears stale player/fac auth + any legacy admin key
+
     (async () => {
       try {
-        const meRes = await fetch('/api/auth/me');
-        if (!meRes.ok) { setSessionChecked(true); return; }
-        const { session } = await meRes.json();
-        if (session?.role === 'admin') {
-          router.push('/admin'); return;
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json() as { session?: { role?: string } };
+          if (data.session?.role === 'admin') {
+            router.replace('/admin');
+          }
         }
-      } catch { /* Show login form on any error */ }
-      setSessionChecked(true);
+      } catch {
+        // Network error on the /me check is non-fatal — the user stays on the login page.
+      }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!secret.trim()) return;
-    setErr(''); setLoad(true);
+    setErr('');
+    setLoading(true);
     try {
       const res  = await fetch('/api/auth/login', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ type: 'admin', secret }),
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json' },
+        body:        JSON.stringify({ type: 'admin', secret }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t('common.error'));
-      saveAdminAuth(secret.trim());
+      const data = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? t('common.error'));
+      // The server has written the HttpOnly session cookie.
+      // No credential is stored client-side — navigate directly.
       router.push('/admin');
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : t('common.error'));
-      setLoad(false);
+      setLoading(false);
     }
   };
-
-  // Show spinner while checking for an existing session
-  if (!sessionChecked) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center" style={{ position: 'relative', zIndex: 1 }}>
-        <span className="w-5 h-5 border-2 rounded-full animate-spin"
-          style={{ borderColor: 'var(--border-md)', borderTopColor: 'var(--red)' }} />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-dvh flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
@@ -71,48 +63,37 @@ export default function AdminLoginPage() {
 
         {/* ── Hero ── */}
         <div className="text-center mb-8 animate-fade-slide-up">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
-            style={{ background: 'rgba(234,67,53,0.10)', border: '1px solid rgba(234,67,53,0.30)' }}>
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
+            style={{ background: 'rgba(234,67,53,0.10)', border: '1px solid rgba(234,67,53,0.30)' }}
+          >
             <ShieldLockIcon size={28} style={{ color: 'var(--red)' }} aria-hidden="true" />
           </div>
           <h1 className="text-3xl font-black tracking-tight" style={{ color: 'var(--foreground)' }}>
             {t('login.admin.title')}
           </h1>
-          <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>{t('login.admin.subtitle')}</p>
+          <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>
+            {t('login.admin.subtitle')}
+          </p>
         </div>
 
         <div className="w-full max-w-sm animate-scale-in space-y-3" style={{ animationDelay: '80ms' }}>
 
           {/* ── Login card ── */}
-          <div className="glass-card" style={{ background: 'rgba(234,67,53,0.06)', border: '1px solid rgba(234,67,53,0.28)' }}>
-            <p className="text-[10px] font-mono font-bold uppercase tracking-widest mb-1 flex items-center gap-1.5"
-              style={{ color: 'var(--red)' }}>
+          <div
+            className="glass-card"
+            style={{ background: 'rgba(234,67,53,0.06)', border: '1px solid rgba(234,67,53,0.28)' }}
+          >
+            <p
+              className="text-[10px] font-mono font-bold uppercase tracking-widest mb-1 flex items-center gap-1.5"
+              style={{ color: 'var(--red)' }}
+            >
               <LockIcon size={12} aria-hidden="true" />
               {t('login.admin.label')}
             </p>
-            <p className="text-xs mb-5" style={{ color: 'var(--text-muted)' }}>{t('login.admin.hint')}</p>
-
-            {/* Saved auth notice */}
-            {savedAuth && (
-              <div className="mb-4 px-3 py-2 rounded-lg flex items-center justify-between gap-2 text-[9px] font-mono"
-                style={{ background: 'rgba(234,67,53,0.08)', border: '1px solid rgba(234,67,53,0.20)' }}>
-                <span className="flex items-center gap-1.5" style={{ color: 'var(--red)' }}>
-                  <CheckCircleIcon size={12} style={{ flexShrink: 0 }} />
-                  {t('auth.saved_admin')}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span style={{ color: 'var(--text-dim)' }}>{t('auth.expiry_note')} · {authExpiresIn(savedAuth.savedAt)}</span>
-                  <button
-                    onClick={() => { clearAdminAuth(); setSavedAuth(null); setSecret(''); }}
-                    className="flex items-center justify-center w-5 h-5 rounded hover:opacity-70 transition-opacity"
-                    style={{ background: 'var(--surface)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}
-                    aria-label="Clear saved session"
-                  >
-                    <XIcon size={9} />
-                  </button>
-                </div>
-              </div>
-            )}
+            <p className="text-xs mb-5" style={{ color: 'var(--text-muted)' }}>
+              {t('login.admin.hint')}
+            </p>
 
             <form onSubmit={handleSubmit} className="space-y-3">
               <input
@@ -123,15 +104,24 @@ export default function AdminLoginPage() {
                 className="glass-input"
                 required
                 disabled={loading}
-                autoFocus={!savedAuth}
+                autoFocus
                 aria-label="Admin secret key"
               />
+
               {err && (
-                <p className="text-[10px] font-mono px-3 py-2 rounded-lg" role="alert"
-                  style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-border)' }}>
+                <p
+                  className="text-[10px] font-mono px-3 py-2 rounded-lg"
+                  role="alert"
+                  style={{
+                    background: 'var(--red-dim)',
+                    color:      'var(--red)',
+                    border:     '1px solid var(--red-border)',
+                  }}
+                >
                   {err}
                 </p>
               )}
+
               <button
                 type="submit"
                 disabled={loading || !secret.trim()}
@@ -140,8 +130,10 @@ export default function AdminLoginPage() {
               >
                 {loading ? (
                   <>
-                    <span className="w-3.5 h-3.5 border-2 rounded-full animate-spin"
-                      style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
+                    <span
+                      className="w-3.5 h-3.5 border-2 rounded-full animate-spin"
+                      style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }}
+                    />
                     {t('login.verifying')}
                   </>
                 ) : (
@@ -156,14 +148,18 @@ export default function AdminLoginPage() {
 
           {/* ── Footer links ── */}
           <div className="flex justify-center gap-5">
-            <a href="/player-login"
+            <a
+              href="/player-login"
               className="text-[10px] font-mono font-bold hover:opacity-70 transition-opacity"
-              style={{ color: 'var(--blue)' }}>
+              style={{ color: 'var(--blue)' }}
+            >
               {t('login.player_link')}
             </a>
-            <a href="/facilitator-login"
+            <a
+              href="/facilitator-login"
               className="text-[10px] font-mono font-bold hover:opacity-70 transition-opacity"
-              style={{ color: 'var(--green)' }}>
+              style={{ color: 'var(--green)' }}
+            >
               {t('login.facilitator_link')}
             </a>
           </div>
