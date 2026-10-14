@@ -1,37 +1,50 @@
 import { NextResponse } from 'next/server';
-import { getParticipants, getParticipantCount } from '@/lib/db';
+import { getParticipants, countParticipants } from '@/lib/db';
+import {
+  checkRateLimit,
+  getClientIP,
+  logSecurity,
+  parsePosInt,
+} from '@/lib/security';
 import { getSession } from '@/lib/session';
-import { checkRateLimit, getClientIP } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_LIMIT  = 100;
-const MAX_OFFSET = 100_000;
+const MAX_OFFSET = 50_000;
 
 export async function GET(req: Request) {
-  // ── Auth: admin or facilitator only ───────────────────────────────────────
   const session = await getSession();
+
+  // Both admins and facilitators may access this endpoint; players may not.
   if (!session || (session.role !== 'admin' && session.role !== 'facilitator')) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 
   const ip = getClientIP(req);
-  if (!checkRateLimit(`participants-list:${ip}`, 30, 60)) {
-    return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429 });
+  if (!checkRateLimit(`participants-list:${ip}`, 60, 60)) {
+    return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
   }
 
-  // ── Pagination parameters ─────────────────────────────────────────────────
   const { searchParams } = new URL(req.url);
-  const limit  = Math.min(MAX_LIMIT,  Math.max(1, parseInt(searchParams.get('limit')  ?? '50')));
-  const offset = Math.min(MAX_OFFSET, Math.max(0, parseInt(searchParams.get('offset') ?? '0')));
+
+  const limit  = parsePosInt(searchParams.get('limit'),  50, MAX_LIMIT);
+  const offset = parsePosInt(searchParams.get('offset'),  0, MAX_OFFSET);
+
+  const facCode = session.role === 'facilitator' ? (session.facCode ?? '') : undefined;
 
   try {
     const [participants, total] = await Promise.all([
-      getParticipants(limit, offset),
-      getParticipantCount(),
+      getParticipants({ limit, offset, facCode }),
+      countParticipants({ facCode }),
     ]);
+
     return NextResponse.json({ participants, total, limit, offset });
-  } catch {
+  } catch (err: unknown) {
+    logSecurity('error', 'api_error', {
+      route:   'GET /api/participants',
+      message: err instanceof Error ? err.message : 'unknown',
+    });
     return NextResponse.json({ error: 'Failed to fetch participants.' }, { status: 500 });
   }
 }
