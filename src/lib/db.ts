@@ -477,32 +477,6 @@ export async function getUploadBatches(facCode: string): Promise<UploadBatch[]> 
   return data ?? [];
 }
 
-/**
- * Rolls back an upload batch atomically via a Supabase RPC.
- *
- * The RPC (rollback_batch) wraps the member deletion and batch status update
- * in a single database transaction, preventing partial-rollback inconsistency
- * if the server crashes between the two operations.
- *
- * SQL migration to run in Supabase Dashboard → SQL Editor:
- *
- *   CREATE OR REPLACE FUNCTION rollback_batch(p_id uuid, p_fac_code text)
- *   RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $$
- *   DECLARE v_batch upload_batches%ROWTYPE;
- *   BEGIN
- *     SELECT * INTO v_batch FROM upload_batches
- *       WHERE id = p_id AND fac_code = p_fac_code FOR UPDATE;
- *     IF NOT FOUND OR v_batch.rolled_back THEN RETURN false; END IF;
- *     DELETE FROM facilitator_members
- *       WHERE fac_code = p_fac_code AND batch_id = p_id;
- *     UPDATE upload_batches SET rolled_back = true WHERE id = p_id;
- *     RETURN true;
- *   END;
- *   $$;
- *
- * If the RPC is not yet deployed, this function falls back to the previous
- * two-step approach (with the existing non-atomic caveat documented below).
- */
 export async function rollbackBatch(
   id: string,
   facCode: string,
