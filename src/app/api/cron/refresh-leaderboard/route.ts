@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getParticipants, getBadges, updateParticipant, getSystemSetting, setSystemSetting } from '@/lib/db';
+import {
+  getParticipants,
+  getAllActiveBadgesGrouped,
+  updateParticipant,
+  getSystemSetting,
+  setSystemSetting,
+} from '@/lib/db';
 import { verifyCronSecret, validateUUID, logSecurity } from '@/lib/security';
+import { calcArcadePoints, ACTIVE_PERIOD_START } from '@/lib/scoring';
 
-/** Periode aktif Arcade 2026 */
-const ACTIVE_START = '2026-07-01';
+export const dynamic = 'force-dynamic';
+export const runtime  = 'nodejs';
 
-// ── Serverless-safe deduplication ─────────────────────────────────────────────
-// Module-level `lastRunAt` doesn't work in serverless — each warm instance
-// has independent memory. Use a Supabase row as shared state instead.
 const DEDUP_KEY    = 'cron_refresh_leaderboard_last_run';
 const MIN_INTERVAL = 5 * 60 * 1_000;
 
@@ -21,37 +25,31 @@ async function markRan(): Promise<void> {
   await setSystemSetting(DEDUP_KEY, String(Date.now()));
 }
 
-export const dynamic = 'force-dynamic';
-export const runtime  = 'nodejs';
+type BadgeEntry = { category: string; earned_date: string };
 
 export async function GET(request: Request) {
-  /* ── Auth ─────────────────────────────────────────────────────────── */
   if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 
-  /* ── Deduplication guard ──────────────────────────────────────────── */
   if (!(await shouldRun())) {
     return NextResponse.json(
-      { message: 'Sudah berjalan baru-baru ini. Coba lagi nanti.' },
+      { message: 'Run skipped: job executed recently. Try again later.' },
       { status: 429 },
     );
   }
   await markRan();
 
-  /* ── Fetch all participants ───────────────────────────────────────── */
   let participants: Awaited<ReturnType<typeof getParticipants>>;
   try {
     participants = await getParticipants();
   } catch {
     logSecurity('error', 'api_error', { route: 'cron/refresh-leaderboard', step: 'fetch' });
-    return NextResponse.json({ error: 'Gagal mengambil data peserta.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch participants.' }, { status: 500 });
   }
 
   const result = {
     job:        'refresh-leaderboard',
-    timezone:   'Asia/Jakarta (WIB, UTC+7)',
-    scheduledAt:'23:30 WIB',
     total:      participants.length,
     updated:    0,
     skipped:    0,
@@ -67,52 +65,50 @@ export async function GET(request: Request) {
     }>,
   };
 
-  /* ── Recalculate points per participant ───────────────────────────── */
-  for (const p of participants) {
-    if (!validateUUID(p.id)) {
-      result.skipped++;
-      logSecurity('warn', 'invalid_uuid', { route: 'cron/refresh-leaderboard' });
-      continue;
-    }
-
-    try {
-      const badges  = await getBadges(p.id);
-      type B = (typeof badges)[number];
-      const active  = badges.filter((b: B) => b.earned_date >= ACTIVE_START);
-      const games   = active.filter((b: B) => b.category === 'game').length;
-      const skills  = active.filter((b: B) => b.category === 'skill_badge').length;
-      const points  = games + skills * 0.5;
-
-      await updateParticipant(p.id, { monthly_points: points });
-      result.updated++;
-    } catch {
-      result.failed++;
-      logSecurity('warn', 'sync_error', {
-        route: 'cron/refresh-leaderboard',
-        step:  'recalculate',
-      });
-    }
-
-    /* Kecil jeda agar tidak membanjiri DB read */
-    await new Promise<void>(r => setTimeout(r, 200));
+  let badgeMap: Map<string, BadgeEntry[]>;
+  try {
+    badgeMap = (await getAllActiveBadgesGrouped(ACTIVE_PERIOD_START)) as Map<string, BadgeEntry[]>;
+  } catch {
+    logSecurity('error', 'api_error', { route: 'cron/refresh-leaderboard', step: 'bulk-badges' });
+    return NextResponse.json({ error: 'Failed to fetch badge data.' }, { status: 500 });
   }
 
-  /* ── Build fresh leaderboard snapshot ────────────────────────────── */
+  // Recalculate points for every participant without extra DB reads.
+  const updatePromises = participants
+    .filter(p => validateUUID(p.id))
+    .map(async p => {
+      try {
+        const active = (badgeMap.get(p.id) ?? []).filter(b => b.earned_date >= ACTIVE_PERIOD_START);
+        const games  = active.filter(b => b.category === 'game').length;
+        const skills = active.filter(b => b.category === 'skill_badge').length;
+        // M-5 FIX: calcArcadePoints() from scoring.ts instead of inline formula.
+        const points = calcArcadePoints(games, skills);
+        await updateParticipant(p.id, { monthly_points: points });
+        result.updated++;
+      } catch {
+        result.failed++;
+        logSecurity('warn', 'sync_error', {
+          route: 'cron/refresh-leaderboard',
+          step:  'recalculate',
+        });
+      }
+    });
+
+  await Promise.all(updatePromises);
+  result.skipped = participants.filter(p => !validateUUID(p.id)).length;
+
+  // Build fresh leaderboard snapshot from in-memory badge data.
   try {
-    const fresh = await getParticipants();       // re-fetch setelah update
-    type P = (typeof fresh)[number];
+    const fresh = await getParticipants();
     result.leaderboard = fresh
-      .sort((a: P, b: P) => (b.monthly_points ?? 0) - (a.monthly_points ?? 0))
+      .sort((a, b) => (b.monthly_points ?? 0) - (a.monthly_points ?? 0))
       .slice(0, 50)
-      .map((p: P, i: number) => ({
-        rank:   i + 1,
-        name:   p.name,
-        points: p.monthly_points ?? 0,
-        /* games & skills tidak tersimpan di baris participants,
-           tapi leaderboard cukup tampilkan poin untuk snapshot */
-        games:  0,
-        skills: 0,
-      }));
+      .map((p, i) => {
+        const active = (badgeMap.get(p.id) ?? []).filter(b => b.earned_date >= ACTIVE_PERIOD_START);
+        const games  = active.filter(b => b.category === 'game').length;
+        const skills = active.filter(b => b.category === 'skill_badge').length;
+        return { rank: i + 1, name: p.name, points: p.monthly_points ?? 0, games, skills };
+      });
   } catch {
     logSecurity('warn', 'api_error', { route: 'cron/refresh-leaderboard', step: 'snapshot' });
   }
@@ -123,12 +119,9 @@ export async function GET(request: Request) {
     total:   result.total,
     updated: result.updated,
     failed:  result.failed,
-    top1:    result.leaderboard[0]?.name ?? '—',
+    top1:    result.leaderboard[0]?.name   ?? '—',
     top1pts: result.leaderboard[0]?.points ?? 0,
   });
 
-  return NextResponse.json({
-    message: 'Leaderboard berhasil diperbarui.',
-    ...result,
-  });
+  return NextResponse.json({ message: 'Leaderboard refreshed successfully.', ...result });
 }
