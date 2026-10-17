@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
-import { createFacilitatorCode, listFacilitatorCodes, getFacilitatorMemberCount } from '@/lib/db';
 import {
-  sanitizeString,
-  requireJsonContentType,
-  validateOrigin,
-  logSecurity,
-} from '@/lib/security';
+  createFacilitatorCode,
+  listFacilitatorCodes,
+  getFacilitatorMemberCount,
+} from '@/lib/db';
+import { sanitizeString, validateOrigin, logSecurity } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
-// GET — read-only, no CSRF guard needed.
 export async function GET() {
   const s = await getSession();
-  if (s?.role !== 'admin')
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (s?.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+  }
 
   const codes = await listFacilitatorCodes();
   const list  = await Promise.all(
@@ -24,35 +23,38 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  // Content-Type guard
-  if (!requireJsonContentType(req))
-    return NextResponse.json({ error: 'Content-Type must be application/json.' }, { status: 415 });
+  const s = await getSession();
+  if (s?.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+  }
 
-  // CSRF / origin guard
   if (!validateOrigin(req)) {
     logSecurity('warn', 'ssrf_attempt', { reason: 'csrf-admin-facilitators' });
     return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
   }
 
-  const s = await getSession();
-  if (s?.role !== 'admin')
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   let body: Record<string, unknown>;
   try { body = await req.json(); }
-  catch { return NextResponse.json({ error: 'Invalid body.' }, { status: 400 }); }
+  catch { return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 }); }
 
-  const name = sanitizeString(body.name as string ?? '', 100);
-  const code = sanitizeString(body.code as string ?? '', 50).toUpperCase();
+  const name = sanitizeString((body.name as string) ?? '', 100);
+  const code = sanitizeString((body.code as string) ?? '', 50).toUpperCase();
 
-  if (!name || !code)
-    return NextResponse.json({ error: 'Name and code required.' }, { status: 400 });
-  if (!/^[A-Z0-9\-]{4,30}$/.test(code))
-    return NextResponse.json({ error: 'Code must be 4-30 alphanumeric chars.' }, { status: 400 });
+  if (!name || !code) {
+    return NextResponse.json({ error: 'Name and code are required.' }, { status: 400 });
+  }
+
+  // Enforce a strict alphanumeric code format to prevent injection in downstream usage.
+  if (!/^[A-Z0-9\-]{4,30}$/.test(code)) {
+    return NextResponse.json(
+      { error: 'Code must be 4–30 characters: uppercase letters, digits, and hyphens only.' },
+      { status: 400 },
+    );
+  }
 
   const fac = await createFacilitatorCode(name, code);
-  if (!fac)
-    return NextResponse.json({ error: 'Code already exists.' }, { status: 409 });
-
+  if (!fac) {
+    return NextResponse.json({ error: 'Code already exists or creation failed.' }, { status: 409 });
+  }
   return NextResponse.json({ ok: true, facilitator: fac });
 }
