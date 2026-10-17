@@ -110,90 +110,124 @@ npm run dev
  
 ```
 ArcadeTracker/
-├── src/
-│   ├── app/                          # Next.js App Router
-│   │   ├── admin/                    # Admin panel page
-│   │   ├── admin-login/              # Admin login page
-│   │   ├── facilitator/              # Facilitator dashboard page
-│   │   ├── facilitator-login/        # Facilitator login page
-│   │   ├── player-login/             # Player login (Skills Boost URL input)
-│   │   ├── dashboard/                # Player dashboard page
-│   │   ├── api/
-│   │   │   ├── auth/
-│   │   │   │   ├── login/            # POST — authenticate & create session cookie
-│   │   │   │   ├── logout/           # POST — destroy session (rate-limited)
-│   │   │   │   └── me/               # GET  — validate active session
-│   │   │   ├── participants/
-│   │   │   │   ├── route.ts          # GET  — list all participants (leaderboard)
-│   │   │   │   └── [id]/route.ts     # GET/PUT/DELETE — single participant CRUD
-│   │   │   ├── scrape/route.ts       # POST — scrape Skills Boost profile via Cheerio
-│   │   │   ├── skills/route.ts       # GET  — list all GCAF skill badges
-│   │   │   ├── feedback/route.ts     # POST — submit player feedback
-│   │   │   ├── facilitator/
-│   │   │   │   ├── batches/          # GET/POST — CSV import batch management
-│   │   │   │   ├── email/            # POST — send emails to selected members
-│   │   │   │   ├── import/           # POST — bulk CSV participant import
-│   │   │   │   └── members/          # GET/POST/DELETE — member management
-│   │   │   ├── admin/
-│   │   │   │   ├── stats/            # GET  — global statistics
-│   │   │   │   ├── facilitators/     # GET/POST/DELETE — facilitator code management
-│   │   │   │   ├── audit-logs/       # GET  — paginated audit trail
-│   │   │   │   ├── master-sync/      # POST — bulk sync all participants
-│   │   │   │   └── maintenance/      # POST — toggle maintenance mode
-│   │   │   └── cron/
-│   │   │       ├── sync-participants/   # Scheduled: sync badge data (16:00 UTC)
-│   │   │       └── refresh-leaderboard/ # Scheduled: rebuild rankings (16:30 UTC)
-│   │   ├── globals.css                  # Global styles & Tailwind design tokens
-│   │   ├── layout.tsx                   # Root layout with metadata and providers
-│   │   └── page.tsx                     # Root redirect (→ /player-login)
-│   │
-│   ├── components/
-│   │   ├── Dashboard.tsx             # Player dashboard (Overview / Catalog / Badges tabs)
-│   │   ├── DashboardSkeleton.tsx     # Loading skeleton for player dashboard
-│   │   ├── FacilitatorPanel.tsx      # Facilitator dashboard (members, import, email, history)
-│   │   ├── Leaderboard.tsx           # Leaderboard panel for Players
-│   │   ├── AdminPanel.tsx            # Full admin control panel
-│   │   ├── ProfileHeader.tsx         # Avatar, name, tier badge, points, sync button
-│   │   ├── ActivityChart.tsx         # Badge activity bar/line chart
-│   │   ├── ActivityHeatmap.tsx       # 26-week calendar heatmap
-│   │   ├── AccessCodeModal.tsx       # Modal for game track access codes
-│   │   ├── Header.tsx                # Navigation bar with theme + language toggle
-│   │   ├── PlayerShell.tsx           # Layout wrapper for player-facing pages
-│   │   ├── Icons.tsx                 # SVG 
-│   │   ├── PlayerDashboardClient.tsx # Client-side state for player dashboard
-│   │   ├── Providers.tsx             # Global context providers (theme, language)
-│   │   ├── SignOutDialog.tsx         # Confirmation dialog for sign-out
-│   │   ├── ThemeLangToggle.tsx       # Combined dark/light + language switcher
-│   │   ├── ThemeToggle.tsx           # Dark/light mode toggle button
-│   │   └── Toast.tsx                 # Toast notification system
-│   │
-│   ├── lib/
-│   │   ├── db.ts                     # Supabase client + all database query functions
-│   │   ├── i18n.ts                   # Full i18n string map (EN / ID / JP)
-│   │   ├── LanguageContext.tsx       # React context for language switching
-│   │   ├── localAuth.ts              # LocalStorage-based facilitator auth persistence
-│   │   ├── security.ts               # Rate limiting, CSRF, SSRF, input sanitization
-│   │   ├── session.ts                # HMAC session creation and verification
-│   │   ├── session-constants.ts      # Cookie name and max-age constants (Edge-safe)
-│   │   ├── streak.ts                 # Consecutive-day streak computation + localStorage cache
-│   │   ├── supabase-client.ts        # Browser-side Supabase client (anon key)
-│   │   ├── ThemeContext.tsx          # React context for dark/light theme
-│   │   └── useTheme.ts               # Dark/light theme hook with localStorage persistence
-│   │
-│   └── middleware.ts                 # Edge Middleware — role-based route protection
-│
-├── public/
-│   ├── banner.svg                    # Repository banner
-│   ├── icon.png                      # App icon / favicon
-│   └── OpenGraph.png                 # Social share preview image
-│
-├── .env.local                        # Local environment variables (never commit)
-├── eslint.config.mjs                 # ESLint configuration
-├── next.config.ts                    # Next.js config: security headers, image hosts
-├── postcss.config.mjs                # PostCSS config for Tailwind
-├── tsconfig.json                     # TypeScript configuration
-├── vercel.json                       # Vercel deployment config + cron job schedules
-└── package.json                      # Dependencies and npm scripts
+├── public
+│   ├── 500px.png
+│   ├── OpenGraph.png
+│   └── banner.svg
+├── src
+│   ├── __tests__
+│   │   ├── api.test.ts
+│   │   ├── milestones.test.ts
+│   │   ├── security.test.ts
+│   │   └── session.test.ts
+│   ├── app
+│   │   ├── admin
+│   │   │   └── page.tsx
+│   │   ├── admin-login
+│   │   │   └── page.tsx
+│   │   ├── api
+│   │   │   ├── admin
+│   │   │   │   ├── audit-logs
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── facilitators
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── maintenance
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── master-sync
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── stats
+│   │   │   │       └── route.ts
+│   │   │   ├── auth
+│   │   │   │   ├── login
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── logout
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── me
+│   │   │   │       └── route.ts
+│   │   │   ├── cron
+│   │   │   │   ├── refresh-leaderboard
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── sync-participants
+│   │   │   │       └── route.ts
+│   │   │   ├── facilitator
+│   │   │   │   ├── batches
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── email
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── import
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── members
+│   │   │   │       └── route.ts
+│   │   │   ├── feedback
+│   │   │   │   └── route.ts
+│   │   │   ├── participants
+│   │   │   │   ├── [id]
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   ├── scrape
+│   │   │   │   └── route.ts
+│   │   │   └── skills
+│   │   │       └── route.ts
+│   │   ├── dashboard
+│   │   │   └── page.tsx
+│   │   ├── facilitator
+│   │   │   └── page.tsx
+│   │   ├── facilitator-login
+│   │   │   └── page.tsx
+│   │   ├── player-login
+│   │   │   └── page.tsx
+│   │   ├── globals.css
+│   │   ├── icon.png
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── components
+│   │   ├── AccessCodeModal.tsx
+│   │   ├── ActivityChart.tsx
+│   │   ├── ActivityHeatmap.tsx
+│   │   ├── AdminPanel.tsx
+│   │   ├── Dashboard.tsx
+│   │   ├── DashboardSkeleton.tsx
+│   │   ├── FacilitatorPanel.tsx
+│   │   ├── Header.tsx
+│   │   ├── Icons.tsx
+│   │   ├── Leaderboard.tsx
+│   │   ├── PlayerDashboardClient.tsx
+│   │   ├── PlayerShell.tsx
+│   │   ├── ProfileHeader.tsx
+│   │   ├── Providers.tsx
+│   │   ├── SignOutDialog.tsx
+│   │   ├── ThemeLangToggle.tsx
+│   │   ├── ThemeToggle.tsx
+│   │   └── Toast.tsx
+│   ├── lib
+│   │   ├── LanguageContext.tsx
+│   │   ├── ThemeContext.tsx
+│   │   ├── csp.ts
+│   │   ├── db.ts
+│   │   ├── i18n.ts
+│   │   ├── localAuth.ts
+│   │   ├── milestones.ts
+│   │   ├── scoring.ts
+│   │   ├── scrapeProfile.ts
+│   │   ├── security.ts
+│   │   ├── session-constants.ts
+│   │   ├── session.ts
+│   │   ├── streak.ts
+│   │   ├── supabase-client.ts
+│   │   └── useTheme.ts
+│   ├── instrumentation.ts
+│   └── middleware.ts
+├── .gitignore
+├── LICENSE.txt
+├── README.md
+├── eslint.config.mjs
+├── jest.config.ts
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── tsconfig.json
+└── vercel.json
 ```
 
 ## 🤝 Contributing
@@ -260,4 +294,4 @@ Feel free to open a GitHub issue for any bug reports, feature requests, or gener
 This project is licensed under the **MIT License**.
 See [LICENSE.txt](LICENSE.txt) for the full license text.
 
-<p align="center"> Made with ❤️ by <a href="https://github.com/RakkaEvandra06">RakkaEvandra06</a>, Google Cloud Arcade 2026 </p>
+<p align="center"> Made with ❤️ by <a href="https://github.com/RakkaEvandra06">RakkaEvandra06</a>, Google Cloud Arcade Facilitator 2026 </p>
